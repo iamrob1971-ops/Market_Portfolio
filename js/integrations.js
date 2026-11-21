@@ -8,12 +8,9 @@ const headerChoices=[
  {symbol:"DIA",label:"Dow Jones",sub:"DIA · ETF proxy"},
  {symbol:"QQQ",label:"Nasdaq-100",sub:"QQQ · ETF proxy; not Nasdaq Composite"},
  {symbol:"IWM",label:"Russell 2000",sub:"IWM · ETF proxy"},
- {symbol:"GLD",label:"Gold",sub:"GLD · ETF proxy; not spot gold"},
- {symbol:"SLV",label:"Silver",sub:"SLV · ETF proxy; not spot silver"},
- {symbol:"USO",label:"Oil",sub:"USO · oil-futures ETF proxy; not WTI spot"},
  {symbol:"TLT",label:"Long Treasuries",sub:"TLT · bond ETF proxy; not Treasury yield"}
 ];
-function selectedHeaderSymbols(){return Array.isArray(state.headerWatch)?state.headerWatch:headerChoices.map(c=>c.symbol)}
+function selectedHeaderSymbols(){const allowed=new Set(headerChoices.map(c=>c.symbol));return Array.isArray(state.headerWatch)?state.headerWatch.filter(s=>allowed.has(s)):headerChoices.map(c=>c.symbol)}
 function portfolioSymbols(){return [...new Set(scoped(false).hs.filter(h=>h.kind!=="money"&&(!h.currency||h.currency==="USD")&&/^[A-Z][A-Z0-9.-]{0,14}$/.test(h.symbol.toUpperCase())).map(h=>h.symbol.toUpperCase()))].sort()}
 function symbols(){return [...new Set([...portfolioSymbols(),...selectedHeaderSymbols()])].sort()}
 function headerPanel(){
@@ -23,8 +20,20 @@ function headerPanel(){
   const asof=q?.asof?new Date(q.asof).toLocaleString():"Awaiting refresh";
   return '<div class="market"><small>'+E(c.label)+'</small><strong>'+current+'</strong>'+change+'<small>'+E(c.sub)+'</small><small>'+E(asof)+'</small></div>';
  }).join("");
+ const spot=state.spotSummary||{};
+ const spotDefs=[
+  {id:"XAU",title:"Gold spot",unit:"USD / troy oz"},
+  {id:"XAG",title:"Silver spot",unit:"USD / troy oz"},
+  {id:"WTI",title:"WTI crude reference",unit:"USD / barrel"}
+ ];
+ const spotTiles=spotDefs.map(def=>{
+  const q=spot[def.id],valid=q&&Number(q.price)>0&&Number.isFinite(Date.parse(q.asof));
+  const observation=valid?new Date(q.asof).toLocaleString():"Not retrieved yet";
+  const change=valid&&Number.isFinite(Number(q.change))&&q.change!==null?'<small class="'+(q.change>=0?"positive":"negative")+'">'+(q.change>=0?"+":"")+M(q.change)+(Number.isFinite(Number(q.changePct))&&q.changePct!==null?" ("+Number(q.changePct).toFixed(2)+"%)":"")+'</small>':'<small class="muted">No verified daily comparison</small>';
+  return '<div class="market"><small>'+E(def.title)+'</small><strong>'+(valid?M(q.price):"—")+'</strong><small>'+E(def.unit)+'</small>'+change+'<small>'+E(valid?q.description:"Source pending")+'</small><small>'+E(observation)+'</small></div>';
+ }).join("");
  const target=el("marketOverview");if(!target)return;
- target.insertAdjacentHTML("afterbegin",cards||'<div class="empty">No market header indicators selected.</div>');
+ target.insertAdjacentHTML("afterbegin",spotTiles+cards);
  const form=el("marketHeaderOptions");if(form)form.innerHTML=headerChoices.map(c=>'<label style="display:flex;gap:8px;align-items:center"><input style="width:auto" type="checkbox" data-header-symbol="'+E(c.symbol)+'" '+(choices.includes(c.symbol)?"checked":"")+'><span>'+E(c.label)+' <small>('+E(c.sub)+')</small></span></label>').join("");
  const counts=el("refreshCounts");if(counts){let p=portfolioSymbols(),h=selectedHeaderSymbols(),duplicates=h.filter(x=>p.includes(x)).length;counts.textContent=p.length+" unique holdings tickers + "+h.length+" market indicator symbols − "+duplicates+" shared = "+symbols().length+" requests for the next full refresh."}
 }
@@ -34,7 +43,7 @@ page("live-prices","Price Refresh",'<div class="card"><h2>Price Refresh · Free 
 page("ai-insights","AI Insights",'<div class="card"><h2>Portfolio Q&A</h2><p>Local calculations answer supported questions directly from your account records. No AI key is needed and nothing is sent to Gemini.</p><div class="formgrid"><label>Scope<select id="ai-scope"><option value="current">Selected owner view</option><option value="all">All owners including managed</option></select></label><label>Question<input id="ai-question" placeholder="What is my estimated dividend income?"></label></div><div class="actions"><button class="btn" id="ai-answer">Answer locally</button><button class="btn secondary" data-ai-q="portfolio">Portfolio overview</button><button class="btn secondary" data-ai-q="dividends">Dividends</button><button class="btn secondary" data-ai-q="energy">Energy / shipping baskets</button><button class="btn secondary" data-ai-q="pnl">Unrealized P&L</button></div><div id="ai-local" class="note">Choose a question or enter your own.</div></div><div class="card"><h2>Gemini Analysis · Review Before Sharing</h2><p>Prepare a grounded prompt using exact figures calculated by the app. Copy to Gemini and review the response. Gemini should explain—not independently invent—account figures.</p><label><input type="checkbox" id="ai-detail" style="width:auto"> Include individual positions, quantities, cost basis and account labels in the prompt</label><div class="actions"><button class="btn" id="ai-prepare">Prepare prompt</button><button class="btn secondary" id="ai-copy">Copy prompt</button></div><label>Review the data you will share<textarea id="ai-prompt" rows="10" readonly></textarea></label><p class="muted">No portfolio data is transmitted automatically. Copy/pasting is explicit; avoid sharing family details you do not want sent to another service.</p><a href="https://aistudio.google.com/" target="_blank" rel="noopener noreferrer">Open Google AI Studio</a></div><div class="card"><h2>Future in-app Gemini calls</h2><p>Secure Gemini requests will use Azure Functions and Entra authentication. No Gemini secret belongs in this public HTML app.</p></div>');
 const headerSettings=document.createElement("div");
 headerSettings.className="card";
-headerSettings.innerHTML='<h2>Market Overview Header</h2><p>Select which market references to show at the top of the dashboard. These are ETF share prices—not direct index levels, metal spot prices, oil/barrel or Treasury yields.</p><div id="marketHeaderOptions" class="grid"></div><p class="muted" id="refreshCounts"></p><small>The same quote is reused if an ETF is also owned in a brokerage account. Quotes are saved locally only when you apply the reviewed refresh.</small>';
+headerSettings.innerHTML='<h2>Market Overview Header</h2><p>Select which market references to show at the top of the dashboard. These are ETF share prices—not direct index levels, metal spot prices, oil/barrel or Treasury yields.</p><div id="marketHeaderOptions" class="grid"></div><p class="muted" id="refreshCounts"></p><small>The Finnhub indicators are ETF proxies; gold and silver use separate spot feeds, and WTI uses a labeled oil reference. These other providers do not count toward Finnhub requests. Quotes are locally saved; Finnhub prices are applied only after review.</small>';
 el("live-prices").append(headerSettings);
 headerSettings.addEventListener("change",async event=>{
  const input=event.target.closest("[data-header-symbol]");
@@ -44,6 +53,53 @@ headerSettings.addEventListener("change",async event=>{
  state.headerWatch=headerChoices.map(c=>c.symbol).filter(s=>chosen.has(s));
  await save();
 });
+let spotRunning=false,spotLastAttempt=0;
+const spotStatus=document.createElement("p");spotStatus.id="spot-refresh-status";spotStatus.className="muted";
+const spotButton=document.createElement("button");spotButton.className="btn secondary";spotButton.textContent="Refresh Gold, Silver & WTI";spotButton.id="refresh-spot";
+const headerActions=el("fh-refresh").parentElement;headerActions.append(spotButton);
+headerActions.append(spotStatus);
+async function fetchSpot(){
+ if(spotRunning)return;
+ // Each spot data source is separate from Finnhub and consumes none of its 60/minute allowance.
+ const age=Date.now()-spotLastAttempt;
+ if(age<60000){spotStatus.textContent="Spot sources were checked recently; retry after "+Math.ceil((60000-age)/1000)+" seconds.";return}
+ spotRunning=true;spotLastAttempt=Date.now();spotButton.disabled=true;
+ let successes=0,errors=[];
+ try{
+  for(const [id,api] of [["XAU","https://api.gold-api.com/price/XAU"],["XAG","https://api.gold-api.com/price/XAG"]]){
+   try{
+    const controller=new AbortController(),timer=setTimeout(()=>controller.abort(),10000);
+    let res;try{res=await fetch(api,{cache:"no-store",signal:controller.signal})}finally{clearTimeout(timer)}
+    if(!res.ok)throw Error("HTTP "+res.status);
+    const q=await res.json();
+    const price=Number(q.price),asof=q.updatedAt;
+    if(!(price>0)||!Number.isFinite(Date.parse(asof))||q.symbol!==id||q.currency!=="USD")throw Error("Invalid spot quote or timestamp");
+    if(!state.spotSummary||typeof state.spotSummary!=="object")state.spotSummary={};
+    state.spotSummary[id]={price,asof,source:"Gold-API",description:"Spot ("+id+"/USD) · Gold-API",change:null,changePct:null};
+    successes++;
+   }catch(e){errors.push(id+": "+String(e.message||e))}
+  }
+  try{
+   const controller=new AbortController(),timer=setTimeout(()=>controller.abort(),10000);
+   let res;try{res=await fetch("https://americasoilwatch.com/api/v1/wti",{cache:"no-store",signal:controller.signal})}finally{clearTimeout(timer)}
+   if(!res.ok)throw Error("HTTP "+res.status);
+   const q=await res.json(),price=Number(q.priceUsd);
+   const asof=q.observedAt||q.sessionDate;
+   if(!(price>0)||!Number.isFinite(Date.parse(asof)))throw Error("Invalid oil price or observation date");
+   // A WTI front-month futures reference is NOT a physical spot assessment.
+   const futures=/futures|yahoo|CL[FGHJKMNQUVXZ]\d/i.test(String(q.provider||"")+" "+String(q.dataSource||"")+" "+String(q.contract||""));
+   const label=futures?"WTI front-month futures":"WTI reference / reported spot fallback";
+   const pct=Number(q.changePct),delta=Number(q.changeUsd);
+   if(!state.spotSummary||typeof state.spotSummary!=="object")state.spotSummary={};
+   state.spotSummary.WTI={price,asof,source:"AmericasOilWatch",description:label+" · "+(q.provider||"AmericasOilWatch"),change:q.changeUsd!=null&&Number.isFinite(delta)?delta:null,changePct:q.changePct!=null&&Number.isFinite(pct)?pct:null,changeAgainst:q.changeAgainst||null,quoteType:q.quoteType||null};
+   successes++;
+  }catch(e){errors.push("WTI: "+String(e.message||e))}
+  if(successes){await save()}
+  spotStatus.textContent=successes+" of 3 non-Finnhub market quotes updated."+(errors.length?" Unavailable: "+errors.join("; "):"")+" Finnhub request count unchanged.";
+ }finally{spotRunning=false;spotButton.disabled=false}
+}
+spotButton.onclick=fetchSpot;
+
 const status=s=>el("fh-status").textContent=s;
 async function clipboard(t){try{await navigator.clipboard.writeText(t);toast("Copied to clipboard")}catch(e){alert("Clipboard permission unavailable; use HTTPS.")}}
 el("fh-copy").onclick=()=>clipboard(symbols().join(", "));
@@ -86,6 +142,7 @@ el("fh-refresh").onclick=async()=>{
  if(!key)return alert("Enter your Finnhub token first.");
  if(!ss.length)return alert("No eligible USD stock / ETF tickers in the selected owner view.");
  busy=true;stopRequested=false;refreshTargetCount=ss.length;quotes=[];
+ void fetchSpot();
  el("fh-refresh").disabled=true;el("fh-stop").disabled=false;el("fh-apply").disabled=true;
  try{
   for(let i=0;i<ss.length;i++){
