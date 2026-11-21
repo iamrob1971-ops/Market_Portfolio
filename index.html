@@ -10,57 +10,10 @@ header h1{font-size:22px;margin:0}header small{color:#b6c8da}main{max-width:1280
 <nav><button data-tab="dashboard" class="active">Dashboard</button><button data-tab="accounts">Accounts & Owners</button><button data-tab="holdings">Holdings</button><button data-tab="transactions">Transactions</button><button data-tab="income">Dividends</button><button data-tab="baskets">Baskets</button><button data-tab="market">Market Indicators</button><button data-tab="data">Import & Backup</button></nav>
 <section id="dashboard" class="tab show"><div class="grid" id="metrics"></div>
 <div class="card" id="marketIndexWidgetCard">
-<div class="row"><h2>US Market Index References</h2><small>TradingView · Index-linked CFD prices; not official index levels</small></div>
-<p class="muted">The Dow and S&amp;P 500 are tracked here through index-linked CFDs. The Nasdaq figure is <strong>Nasdaq-100, not Nasdaq Composite</strong>. Quotes may differ from the official index and may be delayed.</p>
-<div class="tradingview-widget-container" style="width:100%;min-height:445px">
-<div class="tradingview-widget-container__widget" style="width:100%;height:420px"></div>
-<div class="tradingview-widget-copyright" style="font-size:12px;margin:4px 0">
-<a href="https://www.tradingview.com/markets/indices/quotes-us/" rel="noopener nofollow" target="_blank">Market references</a> by TradingView
-</div>
-<script type="text/javascript" src="https://s3.tradingview.com/external-embedding/embed-widget-market-overview.js" async>
-{
-  "colorTheme": "light",
-  "dateRange": "1D",
-  "locale": "en",
-  "largeChartUrl": "",
-  "isTransparent": false,
-  "showFloatingTooltip": true,
-  "plotLineColorGrowing": "rgba(22,163,74,1)",
-  "plotLineColorFalling": "rgba(220,38,38,1)",
-  "gridLineColor": "rgba(240,243,250,0)",
-  "scaleFontColor": "#334155",
-  "belowLineFillColorGrowing": "rgba(22,163,74,0.10)",
-  "belowLineFillColorFalling": "rgba(220,38,38,0.10)",
-  "belowLineFillColorGrowingBottom": "rgba(22,163,74,0)",
-  "belowLineFillColorFallingBottom": "rgba(220,38,38,0)",
-  "symbolActiveColor": "rgba(59,130,246,0.10)",
-  "tabs": [
-    {
-      "title": "Index-linked markets",
-      "originalTitle": "Indices",
-      "symbols": [
-        {
-          "s": "FOREXCOM:DJI",
-          "d": "Dow-linked CFD"
-        },
-        {
-          "s": "FOREXCOM:SPXUSD",
-          "d": "S&P 500-linked CFD"
-        },
-        {
-          "s": "FOREXCOM:NSXUSD",
-          "d": "Nasdaq-100-linked CFD (not Composite)"
-        }
-      ]
-    }
-  ],
-  "width": "100%",
-  "height": "420",
-  "showSymbolLogo": false,
-  "showChart": true
-}
-</script></div>
-<small>Official <a href="https://www.tradingview.com/markets/indices/quotes-us/" target="_blank" rel="noopener noreferrer">US index levels and Nasdaq Composite</a> are available directly on TradingView. This widget is provider-hosted and does not affect portfolio valuations or Finnhub limits.</small>
+<div class="row"><h2>US Market Indexes · Actual Levels</h2><button class="btn secondary" data-tab-go="real-indexes">Configure FMP source</button></div>
+<p class="muted">Dow Jones Industrial Average, S&amp;P 500, and Nasdaq Composite. Direct FMP index quotes—not ETFs or CFD references. Each row shows its own provider quote timestamp; an intraday quote is not necessarily the finalized official close.</p>
+<div id="fmp-dashboard"></div>
+<small>Updated only when you test or enable automatic FMP requests while this page is visible. Existing figures remain available with their original timestamps between refreshes.</small>
 </div><div class="card"><div class="row"><h2>Market Overview</h2><button class="btn secondary" data-tab-go="real-indexes">Configure index source</button></div><div id="marketOverview" class="markets"></div></div><div class="grid"><div class="card"><h2>Account Breakdown</h2><div id="accountBreakdown"></div></div><div class="card"><h2>Managed Accounts</h2><small>Separate owner groups are excluded from My Portfolio totals unless explicitly selected.</small><div id="managedSummary"></div></div></div><div class="card"><div class="row"><h2>Portfolio Snapshots</h2><button id="saveSnapshot" class="btn">Save snapshot</button></div><div id="snapshots"></div></div><div class="card"><h2>Statement Reconciliation</h2><div id="reconciliation"></div></div></section>
 <section id="accounts" class="tab"><div class="grid"><div class="card"><h2>Owner Groups</h2><form id="ownerForm" class="formgrid"><label>Group name<input name="name" required placeholder="e.g. Mom"></label><label>Reporting group<select name="primary"><option value="false">Managed / separate</option><option value="true">Include in My Portfolio</option></select></label><div class="actions"><button class="btn">Add owner group</button></div></form><div id="ownerList"></div></div><div class="card"><h2>Add Account</h2><form id="accountForm" class="formgrid"><label>Owner group<select name="ownerId" id="accountOwner" required></select></label><label>Brokerage<input name="broker" required placeholder="Fidelity"></label><label>Account label<input name="name" required placeholder="Roth IRA"></label><label>Account type<select name="type"><option>Brokerage</option><option>Roth IRA</option><option>Traditional IRA</option><option>Joint</option><option>Custodial</option><option>401(k)</option><option>Other</option></select></label><div class="actions"><button class="btn">Add account</button></div></form></div></div><div class="card"><h2>Accounts</h2><div id="accountsTable"></div></div></section>
 <section id="holdings" class="tab"><div class="card"><h2>Add / Update Holding</h2><small>Enter aggregate position cost basis, not per-share purchase price. A position is unique by account and ticker.</small><form id="holdingForm" class="formgrid"><label>Account<select name="accountId" id="holdingAccount" required></select></label><label>Ticker<input name="symbol" required placeholder="SCHD"></label><label>Quantity<input name="quantity" type="number" step="any" min="0" required></label><label>Total cost basis ($)<input name="basis" type="number" step="any" min="0" required></label><label>Manual price ($)<input name="price" type="number" step="any" min="0" required></label><label>Type<select name="kind"><option value="security">Stock / ETF / Fund</option><option value="money">Money market fund</option></select></label><div class="actions"><button class="btn">Save holding</button></div></form></div><div class="card"><h2>Cash Balances</h2><form id="cashForm" class="formgrid"><label>Account<select name="accountId" id="cashAccount" required></select></label><label>Cash balance ($)<input name="amount" type="number" step="any" min="0" required></label><div class="actions"><button class="btn">Save cash</button></div></form><small>Enter only cash not already counted as a money market position. Each account has one manual cash balance.</small></div><div class="card"><div class="row"><h2>Holdings & P&L</h2><button class="btn secondary" id="exportHoldings">Export holdings CSV</button></div><div id="holdingsTable"></div></div></section>
@@ -173,4 +126,4 @@ for(let row of rows){let q=Object.fromEntries(head.map((k,j)=>[k,String(row[j]||
 stagedQuotes=quotes;$("applyQuotes").disabled=!quotes.length;$("quotePreview").innerHTML='<p class="note">Review unverified quotes before applying. All accounts holding a ticker will receive that price.</p>'+table(["Symbol","Price","As of","Source"],quotes.map(q=>"<tr>"+td(esc(q.symbol))+td(money(q.price))+td(esc(q.asof))+td(esc(q.source))+"</tr>"))}catch(e){stagedQuotes=null;$("applyQuotes").disabled=true;alert(e.message)}};
 $("applyQuotes").onclick=async()=>{if(!stagedQuotes?.length)return;if(!confirm("Apply "+stagedQuotes.length+" externally researched prices?"))return;let count=0;for(let q of stagedQuotes){for(let h of state.holdings.filter(h=>h.symbol.toUpperCase()===q.symbol)){h.price=q.price;h.marketValue=null;h.quoteAsOf=q.asof;h.quoteSource=q.source;count++}state.quoteHistory.push({...q,id:uid(),importedAt:new Date().toISOString()})}stagedQuotes=null;$("applyQuotes").disabled=true;await save();toast(count+" positions repriced")};
 load().catch(e=>{console.error(e);alert("Local database unavailable: "+e.message)});
-</script><script src="js/integrations.js?v=20261120-keys-index-fix-1"></script><script src="js/live-markets.js?v=20261120-keys-index-fix-1"></script><script src="js/key-preferences.js?v=20261120-keys-index-fix-1"></script></body></html>
+</script><script src="js/integrations.js?v=20261120-keys-index-fix-1"></script><script src="js/live-markets.js?v=20261120-actual-index-dashboard-1"></script><script src="js/key-preferences.js?v=20261120-keys-index-fix-1"></script></body></html>
