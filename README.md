@@ -76,7 +76,7 @@ Quote intake currently accepts USD and valid ISO 8601 timestamps with timezones.
 
 ## Actual US indexes: TradingView hosted widget
 
-The Dashboard embeds TradingView's free branded **Market Data / Market Quotes** widget with the actual index symbols **DJ:DJI** (Dow Jones Industrial Average), **SP:SPX** (S&P 500) and **NASDAQ:IXIC** (Nasdaq Composite). These are **index point levels**, not SPY/DIA/QQQ ETF share prices and not Nasdaq-100.
+The Dashboard tests TradingView's **TVC:DJI**, **TVC:SPX**, and **TVC:IXIC** index-symbol feeds through its branded Market Quotes widget. These reference index levels, not DIA/SPY/QQQ ETF prices. **TradingView limits which index feeds are permitted in third-party embeds.** If the symbols display red warning icons or blank prices, use [TradingView US indices](https://www.tradingview.com/markets/indices/quotes-us/) directly; an embedded widget cannot force access to restricted licensed index data.
 
 - TradingView hosts and updates the display while the dashboard is open; it **does not** consume Finnhub or FMP API calls, or require us to poll these three values every two minutes.
 - Market-data timeliness is controlled by TradingView and each exchange. Free official index feeds can be delayed (for example, TradingView's coverage page lists delayed Dow Jones and Nasdaq index data). Never label this embedded widget as guaranteed real-time.
