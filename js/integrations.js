@@ -3,11 +3,47 @@
 const E=esc,M=money,el=id=>document.getElementById(id);
 let quotes=[],busy=false,stopRequested=false,lastStart=0;
 function scoped(all){let aa=all?state.accounts:accounts(),hs=state.holdings.filter(h=>aa.some(a=>a.id===h.accountId));return {aa,hs,t:totals(aa)}}
-function symbols(){return [...new Set(scoped(false).hs.filter(h=>h.kind!=="money"&&(!h.currency||h.currency==="USD")&&/^[A-Z][A-Z0-9.-]{0,14}$/.test(h.symbol.toUpperCase())).map(h=>h.symbol.toUpperCase()))].sort()}
+const headerChoices=[
+ {symbol:"SPY",label:"S&P 500",sub:"SPY · ETF proxy"},
+ {symbol:"DIA",label:"Dow Jones",sub:"DIA · ETF proxy"},
+ {symbol:"QQQ",label:"Nasdaq-100",sub:"QQQ · ETF proxy; not Nasdaq Composite"},
+ {symbol:"IWM",label:"Russell 2000",sub:"IWM · ETF proxy"},
+ {symbol:"GLD",label:"Gold",sub:"GLD · ETF proxy; not spot gold"},
+ {symbol:"SLV",label:"Silver",sub:"SLV · ETF proxy; not spot silver"},
+ {symbol:"USO",label:"Oil",sub:"USO · oil-futures ETF proxy; not WTI spot"},
+ {symbol:"TLT",label:"Long Treasuries",sub:"TLT · bond ETF proxy; not Treasury yield"}
+];
+function selectedHeaderSymbols(){return Array.isArray(state.headerWatch)?state.headerWatch:headerChoices.map(c=>c.symbol)}
+function portfolioSymbols(){return [...new Set(scoped(false).hs.filter(h=>h.kind!=="money"&&(!h.currency||h.currency==="USD")&&/^[A-Z][A-Z0-9.-]{0,14}$/.test(h.symbol.toUpperCase())).map(h=>h.symbol.toUpperCase()))].sort()}
+function symbols(){return [...new Set([...portfolioSymbols(),...selectedHeaderSymbols()])].sort()}
+function headerPanel(){
+ const choices=selectedHeaderSymbols(),prices=state.headerQuotes||{},cards=headerChoices.filter(c=>choices.includes(c.symbol)).map(c=>{
+  const q=prices[c.symbol],current=q&&Number(q.price)>0?M(q.price):"—",old=q&&Number(q.previousClose)>0?Number(q.previousClose):null;
+  const change=old!==null?'<small class="'+(q.price>=old?"positive":"negative")+'">'+M(q.price-old)+' ('+((q.price-old)/old*100).toFixed(2)+'%)</small>':'<small class="muted">No prior-close comparison</small>';
+  const asof=q?.asof?new Date(q.asof).toLocaleString():"Awaiting refresh";
+  return '<div class="market"><small>'+E(c.label)+'</small><strong>'+current+'</strong>'+change+'<small>'+E(c.sub)+'</small><small>'+E(asof)+'</small></div>';
+ }).join("");
+ const target=el("marketOverview");if(!target)return;
+ target.insertAdjacentHTML("afterbegin",cards||'<div class="empty">No market header indicators selected.</div>');
+ const form=el("marketHeaderOptions");if(form)form.innerHTML=headerChoices.map(c=>'<label style="display:flex;gap:8px;align-items:center"><input style="width:auto" type="checkbox" data-header-symbol="'+E(c.symbol)+'" '+(choices.includes(c.symbol)?"checked":"")+'><span>'+E(c.label)+' <small>('+E(c.sub)+')</small></span></label>').join("");
+ const counts=el("refreshCounts");if(counts){let p=portfolioSymbols(),h=selectedHeaderSymbols(),duplicates=h.filter(x=>p.includes(x)).length;counts.textContent=p.length+" unique holdings tickers + "+h.length+" market indicator symbols − "+duplicates+" shared = "+symbols().length+" requests for the next full refresh."}
+}
 const nav=document.querySelector("nav"),main=document.querySelector("main");
 function page(id,title,html){let b=document.createElement("button");b.dataset.tab=id;b.textContent=title;nav.append(b);let section=document.createElement("section");section.id=id;section.className="tab";section.innerHTML=html;main.append(section);b.addEventListener("click",()=>{document.querySelectorAll(".tab").forEach(x=>x.classList.toggle("show",x.id===id));document.querySelectorAll("nav button").forEach(x=>x.classList.toggle("active",x===b))})}
 page("live-prices","Price Refresh",'<div class="card"><h2>Price Refresh · Free API Test</h2><p>Fetch prices for saved US-listed ticker symbols through Finnhub, then review before applying. Quotes are not guaranteed real-time or complete.</p><div class="note">Enter a free, market-data-only API token for testing. It is not saved to your portfolio or GitHub. The browser-only test sends it as a Finnhub URL parameter, so the token may appear in browser/network logs. The browser token is not secret from extensions or network diagnostics. Prefer a protected Azure Function.</div><div class="formgrid"><label>Finnhub API token (session only)<input type="password" id="fh-key" autocomplete="off" placeholder="Paste your free API key"></label><label>Refresh mode<select id="fh-max"><option value="all" selected>All eligible tickers (recommended)</option><option value="10">First 10 (test)</option></select></label></div><div class="actions"><button class="btn" id="fh-refresh">Refresh All — Preview Quotes</button><button class="btn secondary" id="fh-stop" disabled>Stop refresh</button><button class="btn secondary" id="fh-clear">Clear API key</button><button class="btn secondary" id="fh-copy">Copy tickers</button></div><p id="fh-status" role="status" class="muted">Not connected.</p><small>All selected-owner eligible symbols are requested once, at most 40 starts per minute (1.5 seconds apart). Rate-limit responses cause a cooldown. Existing prices are never overwritten unless you approve the preview. Azure will replace the browser-key test later.</small></div><div class="card"><div class="row"><h2>Review Quotes</h2><button class="btn" id="fh-apply" disabled>Apply selected prices</button></div><div id="fh-table" class="empty">Fetch quotes to preview them.</div></div><div class="card"><h2>Quote Coverage</h2><div id="fh-coverage"></div></div>');
 page("ai-insights","AI Insights",'<div class="card"><h2>Portfolio Q&A</h2><p>Local calculations answer supported questions directly from your account records. No AI key is needed and nothing is sent to Gemini.</p><div class="formgrid"><label>Scope<select id="ai-scope"><option value="current">Selected owner view</option><option value="all">All owners including managed</option></select></label><label>Question<input id="ai-question" placeholder="What is my estimated dividend income?"></label></div><div class="actions"><button class="btn" id="ai-answer">Answer locally</button><button class="btn secondary" data-ai-q="portfolio">Portfolio overview</button><button class="btn secondary" data-ai-q="dividends">Dividends</button><button class="btn secondary" data-ai-q="energy">Energy / shipping baskets</button><button class="btn secondary" data-ai-q="pnl">Unrealized P&L</button></div><div id="ai-local" class="note">Choose a question or enter your own.</div></div><div class="card"><h2>Gemini Analysis · Review Before Sharing</h2><p>Prepare a grounded prompt using exact figures calculated by the app. Copy to Gemini and review the response. Gemini should explain—not independently invent—account figures.</p><label><input type="checkbox" id="ai-detail" style="width:auto"> Include individual positions, quantities, cost basis and account labels in the prompt</label><div class="actions"><button class="btn" id="ai-prepare">Prepare prompt</button><button class="btn secondary" id="ai-copy">Copy prompt</button></div><label>Review the data you will share<textarea id="ai-prompt" rows="10" readonly></textarea></label><p class="muted">No portfolio data is transmitted automatically. Copy/pasting is explicit; avoid sharing family details you do not want sent to another service.</p><a href="https://aistudio.google.com/" target="_blank" rel="noopener noreferrer">Open Google AI Studio</a></div><div class="card"><h2>Future in-app Gemini calls</h2><p>Secure Gemini requests will use Azure Functions and Entra authentication. No Gemini secret belongs in this public HTML app.</p></div>');
+const headerSettings=document.createElement("div");
+headerSettings.className="card";
+headerSettings.innerHTML='<h2>Market Overview Header</h2><p>Select which market references to show at the top of the dashboard. These are ETF share prices—not direct index levels, metal spot prices, oil/barrel or Treasury yields.</p><div id="marketHeaderOptions" class="grid"></div><p class="muted" id="refreshCounts"></p><small>The same quote is reused if an ETF is also owned in a brokerage account. Quotes are saved locally only when you apply the reviewed refresh.</small>';
+el("live-prices").append(headerSettings);
+headerSettings.addEventListener("change",async event=>{
+ const input=event.target.closest("[data-header-symbol]");
+ if(!input)return;
+ const chosen=new Set(selectedHeaderSymbols());
+ if(input.checked)chosen.add(input.dataset.headerSymbol);else chosen.delete(input.dataset.headerSymbol);
+ state.headerWatch=headerChoices.map(c=>c.symbol).filter(s=>chosen.has(s));
+ await save();
+});
 const status=s=>el("fh-status").textContent=s;
 async function clipboard(t){try{await navigator.clipboard.writeText(t);toast("Copied to clipboard")}catch(e){alert("Clipboard permission unavailable; use HTTPS.")}}
 el("fh-copy").onclick=()=>clipboard(symbols().join(", "));
@@ -108,6 +144,10 @@ el("fh-apply").onclick=async()=>{
  if(!confirm("Apply "+selected.length+" Finnhub prices across matching USD holdings? Share quantities and cost basis will not change."))return;
  let changed=0;
  for(let q of selected){
+  if(selectedHeaderSymbols().includes(q.symbol)){
+   if(!state.headerQuotes||typeof state.headerQuotes!=="object")state.headerQuotes={};
+   state.headerQuotes[q.symbol]={price:q.price,previousClose:q.previousClose??null,asof:q.asof,source:q.source};
+  }
   for(let h of state.holdings.filter(h=>h.symbol.toUpperCase()===q.symbol&&h.kind!=="money"&&(!h.currency||h.currency==="USD"))){h.price=q.price;h.marketValue=null;h.previousClose=q.previousClose>0?q.previousClose:null;h.quoteSource=q.source;h.quoteAsOf=q.asof;changed++}
   state.quoteHistory.push({id:uid(),symbol:q.symbol,price:q.price,previousClose:q.previousClose??null,asof:q.asof,currency:"USD",source:q.source,importedAt:new Date().toISOString()});
  }
@@ -173,6 +213,6 @@ el("gateway-ask").onclick=async()=>{
  try{let answer=await gatewayRequest("ask",{question:q,facts});el("gateway-answer").textContent=answer.answer||"No answer returned"}catch(e){el("gateway-answer").textContent=e.message}
 };
 
-const original=render;render=function(){original();coverage()};
-coverage();
+const original=render;render=function(){original();coverage();headerPanel()};
+coverage();headerPanel();
 })();
