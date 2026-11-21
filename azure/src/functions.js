@@ -39,7 +39,7 @@ app.http("quotes", {
       const results = [];
       for (const symbol of symbols) {
         try {
-          const response = await fetch("https://finnhub.io/api/v1/quote?symbol=" + encodeURIComponent(symbol), {
+          const response = await fetch("https://api.finnhub.io/api/v1/quote?symbol=" + encodeURIComponent(symbol), {
             headers: { "X-Finnhub-Token": key }, signal: AbortSignal.timeout(10000)
           });
           if (!response.ok) { results.push({ symbol, error: "Provider HTTP " + response.status }); continue; }
