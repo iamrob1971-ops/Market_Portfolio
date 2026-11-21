@@ -68,6 +68,43 @@ el("ai-prepare").onclick=()=>{
 };
 el("ai-copy").onclick=()=>el("ai-prompt").value?clipboard(el("ai-prompt").value):alert("Prepare a prompt first.");
 function coverage(){let hh=scoped(false).hs,known=hh.filter(h=>Number(h.price)>0).length;el("fh-coverage").innerHTML="<p>"+hh.length+" rows; "+known+" have recorded prices; "+symbols().length+" unique eligible USD symbols. Securities with non-USD currency or money-market status are excluded.</p>"+table(["Ticker","Last recorded source","As of"],hh.filter(h=>h.quoteAsOf).slice(0,25).map(h=>'<tr>'+td(E(h.symbol))+td(E(h.quoteSource||"—"))+td(E(h.quoteAsOf))+'</tr>'))}
+
+/* Optional Azure transport. Server credentials never reach this app. */
+const gatewayCard=document.createElement("div");gatewayCard.className="card";
+gatewayCard.innerHTML='<h2>Secure Azure Connection (optional)</h2><p>Use once the Azure gateway and Entra sign-in are configured. Until then, Finnhub manual refresh and the local Gemini prompt work independently.</p><label>Azure Function origin (HTTPS)<input type="url" id="gateway-url" placeholder="https://example.azurewebsites.net" autocomplete="off"></label><div class="actions"><button class="btn secondary" id="gateway-test">Test Azure connection</button><button class="btn secondary" id="gateway-fetch">Fetch quotes through Azure</button><button class="btn secondary" id="gateway-login">Open Azure sign-in</button></div><div id="gateway-result" class="muted" role="status">Not configured.</div>';
+el("live-prices").append(gatewayCard);
+const geminiCard=document.createElement("div");geminiCard.className="card";
+geminiCard.innerHTML='<h2>Ask Gemini securely via Azure</h2><p>This requires the configured Azure Function, Entra authentication, and a Gemini API key stored only in Azure. Your question and the selected summarized portfolio facts will be sent to your Azure gateway and Google Gemini.</p><button class="btn" id="gateway-ask">Ask Gemini from current facts</button><div id="gateway-answer" style="white-space:pre-wrap;margin-top:14px" class="note">No Azure response yet.</div>';
+el("ai-insights").append(geminiCard);
+function gatewayBase(){let b=el("gateway-url").value.trim().replace(/\/+$/,"");if(!/^https:\/\/[a-z0-9.-]+(?::\d+)?$/i.test(b))throw Error("Enter the HTTPS Azure Function origin in Price Refresh.");return b}
+async function gatewayRequest(path,body){
+ const base=gatewayBase();let options={method:body?"POST":"GET",credentials:"include",headers:{"Accept":"application/json"}};
+ if(body){options.headers["Content-Type"]="application/json";options.body=JSON.stringify(body)}
+ const response=await fetch(base+"/api/"+path,options);
+ if(!response.ok){let detail="";try{detail=(await response.json()).error||""}catch(e){}throw Error("Azure HTTP "+response.status+(detail?": "+detail:"")+". Check Entra sign-in and CORS.")}
+ return await response.json();
+}
+el("gateway-test").onclick=async()=>{try{let s=await gatewayRequest("status");el("gateway-result").textContent="Gateway ready; Finnhub="+s.quotes+"; Gemini="+s.gemini}catch(e){el("gateway-result").textContent=e.message}};
+el("gateway-login").onclick=()=>{try{window.open(gatewayBase()+"/.auth/login/aad","_blank","noopener,noreferrer")}catch(e){alert(e.message)}};
+el("gateway-fetch").onclick=async()=>{
+ let ss=symbols().slice(0,20);if(!ss.length)return alert("No eligible tickers.");el("gateway-result").textContent="Fetching up to 20 symbols via Azure...";
+ try{
+  let result=await gatewayRequest("quotes",{symbols:ss});quotes=ss.map(symbol=>{let q=result.quotes?.find(z=>z.symbol===symbol);if(q&&Number(q.price)>0&&q.currency==="USD"&&Number.isFinite(Date.parse(q.asof))){return {symbol,price:Number(q.price),asof:q.asof,source:q.source||"Azure Finnhub",ok:true,ageHours:(Date.now()-Date.parse(q.asof))/3600000}}return {symbol,ok:false,error:q?.error||"No quote"}});
+  const good=quotes.filter(q=>q.ok).length;
+  el("fh-table").className="tablewrap";
+  el("fh-table").innerHTML='<table><thead><tr><th>Use</th><th>Symbol</th><th>Price USD</th><th>Timestamp</th><th>Status</th></tr></thead><tbody>'+quotes.map(q=>'<tr><td>'+(q.ok?'<input style="width:auto" type="checkbox" data-sym="'+E(q.symbol)+'" checked>':'—')+'</td><td>'+E(q.symbol)+'</td><td>'+(q.ok?M(q.price):'—')+'</td><td>'+E(q.asof||'—')+'</td><td>'+E(q.error||(q.ageHours>24?"Possibly stale":"Review"))+'</td></tr>').join("")+'</tbody></table>';
+  el("fh-apply").disabled=!good;el("gateway-result").textContent=good+" / "+ss.length+" valid quotes; review before applying";
+ }catch(e){el("gateway-result").textContent=e.message}
+};
+el("gateway-ask").onclick=async()=>{
+ const d=analysis(),q=el("ai-question").value.trim()||"Explain the portfolio summary and its major limitations.";
+ let facts={scope:el("ai-scope").value,totalValue:d.t.total,cash:d.t.cash,moneyMarkets:d.t.moneyFund,unrealizedPnL:d.t.pnl,estimatedAnnualDividends:d.t.income,pendingAdjustments:d.t.pending,accountCount:d.aa.length,positionCount:d.hs.length,accounts:d.perAccount,baskets:state.baskets.map(b=>({name:b.name,value:d.hs.filter(h=>h.basketId===b.id).reduce((v,h)=>v+value(h),0)}))};
+ if(el("ai-detail").checked)facts.positions=d.hs.map(h=>({account:label(d.aa.find(a=>a.id===h.accountId)),symbol:h.symbol,shares:h.quantity,price:h.price,basis:h.basis,marketValue:value(h),quoteSource:h.quoteSource||"manual/import",quoteAsOf:h.quoteAsOf||"unknown"}));
+ if(!confirm("Send your selected portfolio facts ("+(el("ai-detail").checked?"including position details":"summary only")+") to Gemini through Azure?"))return;
+ el("gateway-answer").textContent="Contacting Azure Gemini gateway...";
+ try{let answer=await gatewayRequest("ask",{question:q,facts});el("gateway-answer").textContent=answer.answer||"No answer returned"}catch(e){el("gateway-answer").textContent=e.message}
+};
+
 const original=render;render=function(){original();coverage()};
 coverage();
 })();
