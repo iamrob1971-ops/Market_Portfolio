@@ -74,15 +74,19 @@ Go to **Import & Backup → Research Quote Intake**.
 Quote intake currently accepts USD and valid ISO 8601 timestamps with timezones. AI-generated market data is **unverified** and may be inaccurate or stale; do not treat it as a real-time feed. This does not automatically call Gemini or require an API key. Free-tier quote API providers can be integrated later via Azure Functions.
 
 
-## Actual US indexes: TradingView hosted widget
+## Market index references: TradingView Market Overview widget
 
-The Dashboard tests TradingView's **TVC:DJI**, **TVC:SPX**, and **TVC:IXIC** index-symbol feeds through its branded Market Quotes widget. These reference index levels, not DIA/SPY/QQQ ETF prices. **TradingView limits which index feeds are permitted in third-party embeds.** If the symbols display red warning icons or blank prices, use [TradingView US indices](https://www.tradingview.com/markets/indices/quotes-us/) directly; an embedded widget cannot force access to restricted licensed index data.
+The Dashboard uses TradingView's documented `embed-widget-market-overview.js` widget with the following **index-linked CFD references**:
 
-- TradingView hosts and updates the display while the dashboard is open; it **does not** consume Finnhub or FMP API calls, or require us to poll these three values every two minutes.
-- Market-data timeliness is controlled by TradingView and each exchange. Free official index feeds can be delayed (for example, TradingView's coverage page lists delayed Dow Jones and Nasdaq index data). Never label this embedded widget as guaranteed real-time.
-- Keep TradingView branding and attribution. Widget values are isolated from portfolio holdings and calculations (there is no supported API for harvesting the widget's internal data).
-- A browser blocker or provider widget outage can prevent display. The widget has an external link to TradingView's US-index quotes.
-- The older **Actual Indexes** FMP test remains available as an optional experimental separate tab but its duplicate Dashboard card is hidden. Free FMP access previously returned HTTP 402, so leave automatic polling off.
+- `FOREXCOM:DJI` — tracks the Dow Jones Industrial Average.
+- `FOREXCOM:SPXUSD` — tracks the S&P 500.
+- `FOREXCOM:NSXUSD` — tracks the **Nasdaq-100, not Nasdaq Composite**.
+
+These are **not official exchange-published index levels**. They are CFD/index-equivalent quotes. Their values can differ slightly from official index levels, and their timestamps and delays depend on the widget provider. The Dashboard explicitly labels this distinction. The widget's prices are display-only, hosted by TradingView, require no Finnhub/FMP API calls and are excluded from portfolio valuations.
+
+We previously tested the widget with direct `DJ:DJI`, `SP:SPX`, `NASDAQ:IXIC` and alternate `TVC:` index symbols, which rendered blank with warning icons in the user's browser. That can arise from symbol/data entitlements on embedded widgets. The documented CFD sources are the next supported approach. If they also fail, use [TradingView's official US index page](https://www.tradingview.com/markets/indices/quotes-us/) instead of silently substituting equity ETFs.
+
+**Macroaxis was not embedded:** its published free widget license says it does **not** work on HTTPS websites, while GitHub Pages is served over HTTPS. It would require an appropriate paid license. Its [Global Index Ticker widget terms](https://www.macroaxis.com/invest/widgets/native/indexTicker?g=All) disclose this restriction.
 
 ## Focus watchlists and visible-only market updates
 
