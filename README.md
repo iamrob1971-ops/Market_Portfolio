@@ -10,6 +10,8 @@ Personal, local-first stock market and portfolio dashboard. Hosted as a static G
 - Cash balance tracking without double-counting money market fund positions.
 - Manual buy/sell transaction journal and recorded realized P&L estimates.
 - Copy ticker list/Gemini research prompt, paste researched quotes with timestamps, preview and apply.
+- Finnhub free-tier manual quote preview (session-only key), source/timestamp validation and optional Azure gateway.
+- Local numeric Q&A and structured Gemini prompts with explicit owner scopes.
 - Manual market-index/commodity indicators, shown as manual data.
 - Dividend profiles and estimated annual income.
 - Cross-account basket creation, tagging, and aggregate basket reports.
@@ -70,6 +72,30 @@ Go to **Import & Backup → Research Quote Intake**.
 4. A matching ticker is updated across all accounts without changing quantity, cost basis or transaction history. Imported quotes retain source and timestamp metadata in the local database.
 
 Quote intake currently accepts USD and valid ISO 8601 timestamps with timezones. AI-generated market data is **unverified** and may be inaccurate or stale; do not treat it as a real-time feed. This does not automatically call Gemini or require an API key. Free-tier quote API providers can be integrated later via Azure Functions.
+
+
+## New: Free quote refresh (manual, review before apply)
+
+Go to **Price Refresh**.
+
+1. Create a free market-data token through [Finnhub](https://finnhub.io/). Verify the service's current license/quotas for personal use.
+2. Enter that **limited market-data-only token** in the password field *in your own trusted browser*. It is held in the page's memory only; it is never written to IndexedDB, JSON backups, or GitHub. It is nevertheless visible to the client browser runtime, so use the future Azure gateway for stronger key protection.
+3. Click **Fetch quote preview**. The app requests distinct USD stock/ETF symbols for the currently selected owner view. The initial limit is 20 symbols per refresh.
+4. Review price, timestamp, coverage and possibly stale results. Uncheck anything questionable.
+5. Click **Apply selected prices**. The app updates price and quote provenance across matching positions without changing quantities, cost basis, baskets, dividends or transaction history.
+6. Use **Import & Backup → Export full JSON backup** regularly.
+
+**No live-refresh-on-page-load; no broker trades.** A free-tier API may fail due to quota, missing symbols, CORS/browser restrictions or data entitlements. Direct quote mode does not handle foreign-currency shares, index derivatives, or money-market funds. Failed quotes never overwrite older values.
+
+## New: Portfolio Q&A and Gemini
+
+Go to **AI Insights**. The local Q&A calculates account values, unrealized P&L, estimated dividend income, and basket values directly from saved records—**without an external model**. Select the owner scope carefully; *All owners* includes managed accounts.
+
+For Gemini explanations, type a question and click **Prepare prompt**. Review the structured prompt before copying it into [Google AI Studio](https://aistudio.google.com/). By default it shares account-level summaries; selecting **Include individual positions** explicitly adds ticker, quantity, account label and cost basis details.
+
+**Future secure connected mode:** the \`azure/\` folder now contains an Azure Functions gateway for Finnhub quote calls and Gemini Q&A. Once you deploy it, enable Microsoft Entra Easy Auth, restrict authorized users, add provider secrets in protected Azure settings, and set appropriate CORS. Enter the function origin in **Price Refresh** to test it. The Azure client is a starter that may need an MSAL authentication integration to work across browser origins; it is not deployed or automatically functional today. See [Azure gateway instructions](azure/README.md).
+
+Gemini responses are *narrative assistance*, never the source of authoritative holdings calculations.
 
 ## CSV import
 
