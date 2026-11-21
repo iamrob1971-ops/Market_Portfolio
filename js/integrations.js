@@ -12,6 +12,24 @@ const status=s=>el("fh-status").textContent=s;
 async function clipboard(t){try{await navigator.clipboard.writeText(t);toast("Copied to clipboard")}catch(e){alert("Clipboard permission unavailable; use HTTPS.")}}
 el("fh-copy").onclick=()=>clipboard(symbols().join(", "));
 el("fh-clear").onclick=()=>{el("fh-key").value="";status("Session key cleared.")};
+
+const diagnosticButton=document.createElement("button");
+diagnosticButton.className="btn secondary";diagnosticButton.id="fh-test-one";diagnosticButton.textContent="Test AAPL connection";
+el("fh-refresh").parentElement.append(diagnosticButton);
+diagnosticButton.onclick=async()=>{
+ const key=el("fh-key").value.trim();if(!key)return alert("Enter the Finnhub API token first.");
+ diagnosticButton.disabled=true;status("Testing one AAPL quote against api.finnhub.io...");
+ try{
+  const ctrl=new AbortController(),timer=setTimeout(()=>ctrl.abort(),10000);
+  let res;try{res=await fetch("https://api.finnhub.io/api/v1/quote?symbol=AAPL&token="+encodeURIComponent(key),{method:"GET",cache:"no-store",signal:ctrl.signal})}finally{clearTimeout(timer)}
+  if(!res.ok){let text=await res.text().catch(()=>"");status("API reachable. HTTP "+res.status+(res.status===401?" — key invalid":res.status===403?" — key or entitlement denied":res.status===429?" — request limit exceeded":" — provider rejected request")+". "+text.slice(0,150).replace(/[^\x20-\x7e]/g," "));return}
+  const j=await res.json();
+  if(Number(j.c)>0&&Number(j.t)>0){status("API reachable. AAPL quote returned: "+money(j.c)+" as of "+new Date(j.t*1000).toLocaleString()+". Now try Fetch quote preview.")}
+  else status("API reachable (HTTP 200), but AAPL returned no usable quote. Check Finnhub entitlement/status.");
+ }catch(e){let isAbort=e?.name==="AbortError";status(isAbort?"AAPL connection timed out.": "Browser could not contact api.finnhub.io. Check site blockers, extensions, security software, network restrictions or browser console CORS errors.");}
+ finally{diagnosticButton.disabled=false}
+};
+
 el("fh-refresh").onclick=async()=>{
  if(busy)return;let key=el("fh-key").value.trim(),ss=symbols().slice(0,Number(el("fh-max").value));
  if(!key)return alert("Enter a free Finnhub API token for this session.");
@@ -21,7 +39,7 @@ el("fh-refresh").onclick=async()=>{
   let symbol=ss[i];status("Fetching "+(i+1)+" / "+ss.length+": "+symbol);
   try{
    const c=new AbortController(),timer=setTimeout(()=>c.abort(),12000);let response;
-   try{response=await fetch("https://finnhub.io/api/v1/quote?symbol="+encodeURIComponent(symbol)+"&token="+encodeURIComponent(key),{method:"GET",cache:"no-store",signal:c.signal})}finally{clearTimeout(timer)}
+   try{response=await fetch("https://api.finnhub.io/api/v1/quote?symbol="+encodeURIComponent(symbol)+"&token="+encodeURIComponent(key),{method:"GET",cache:"no-store",signal:c.signal})}finally{clearTimeout(timer)}
    if(!response.ok)throw Error("HTTP "+response.status);
    let j=await response.json(),price=Number(j.c),ts=Number(j.t);
    if(!(price>0)||!(ts>0))throw Error("No quote or unsupported ticker");
