@@ -74,6 +74,36 @@ Go to **Import & Backup → Research Quote Intake**.
 Quote intake currently accepts USD and valid ISO 8601 timestamps with timezones. AI-generated market data is **unverified** and may be inaccurate or stale; do not treat it as a real-time feed. This does not automatically call Gemini or require an API key. Free-tier quote API providers can be integrated later via Azure Functions.
 
 
+## Focus watchlists and visible-only market updates
+
+There are two **separate** live features, neither of which places orders or syncs with brokerage accounts.
+
+### Watchlists & Live — Finnhub WebSocket
+
+The **Watchlists & Live** tab supports multiple local watchlist groups. Add symbols from currently visible holdings or manually type any valid stock symbol; remove them or delete a group without affecting holdings.
+
+- To stream, enter the same Finnhub API token used for **Price Refresh** and click **Start live updates**. The application opens one \`wss://ws.finnhub.io\` connection and subscribes to the union of the watchlist symbols, capped at **20 unique symbols** for this initial implementation. Finnhub's plan-specific subscription/connection entitlement should be verified with the user's free key.
+- Trade event prices appear in the live watchlist only. They are **not** guaranteed to be consolidated/official exchange prices or to update every second.
+- A **Stop** control closes the connection. The connection also closes while the browser page is hidden and resumes when visible, unless the user stopped it. Reconnection attempts are limited with backoff.
+- Streamed prices **do not automatically modify portfolio valuations**. Use **Apply streamed prices to holdings** after review to change saved prices for matching holdings; shares and cost basis never change.
+- The WebSocket token is kept in the browser tab's memory and included in the provider's WebSocket URL. It is visible to the browser/runtime and should not be placed in the public GitHub repository. One open connection per API key is safest for free-tier testing; avoid multiple browser tabs with an active stream.
+- **Refresh All** remains available for a complete REST portfolio snapshot with previous-closing-price data. Trade stream messages do not include the complete REST quote fields.
+
+### Actual Indexes — optional FMP direct-index feed (experimental)
+
+The **Actual Indexes** tab is separate from all equity ETFs. It expects direct index point values from Financial Modeling Prep (FMP) for **\`^DJI\`**, **\`^GSPC\`** and **\`^IXIC\`** via **one batch request** to \`/stable/batch-index-quotes\`. The misleading SPY/DIA/QQQ/IWM benchmark proxy header tiles were removed.
+
+- Obtain an FMP free API key separately. Free-tier support for this specific endpoint, data freshness, browser CORS access, and index redistribution rights are **not guaranteed**; use **Test once** to verify.
+- If the test works, select **Enable visible-only auto updates**. The default is **every two minutes**, on US weekdays during **9:30 AM–4:00 PM Eastern**, only while the page is visible. Other options: three or five minutes.
+- The free plan documents **250 API calls per day**. The app uses a conservative **200-request local per-day browser-tab cap**, which may not capture calls made on other tabs/devices. Two-minute polling for a 6.5-hour regular session consumes about 195 calls, assuming a working one-request batch endpoint.
+- If the provider rejects a request, a browser/network request fails, or the response lacks expected actual indexes, automatic requests stop rather than wasting the daily allowance.
+- The provider's response timestamp (when included) is distinguished from the retrieval timestamp; no index value is invented or silently replaced by ETF proxy values. Indexes saved to the portfolio are strictly display data and do not reprice account holdings.
+- **Automatic polling does not run after the page is closed or while hidden.** GitHub Pages is still a static site and does not run a background scheduler.
+
+### MarketWatch scraping
+
+No MarketWatch scraper has been implemented. Repeatedly scraping a news/quote webpage can break with page changes, run into browser CORS and bot controls, and raise market-data licensing/terms issues. Prefer authorized APIs or an explicitly licensed embedded index widget instead of treating website display as permission to extract market quotes.
+
 ## Market overview: gold and silver spot plus WTI market reference
 
 The dashboard Market Overview now displays independently sourced **spot gold** and **spot silver** quotes in **USD per troy ounce** from [Gold-API](https://gold-api.com/docs), plus a **WTI crude reference** in **USD per barrel** from [AmericasOilWatch](https://americasoilwatch.com/api). The latter is typically a quoted **front-month futures contract**, **not the official physical Cushing WTI spot price**, and the tile identifies the provider and reference type. The oil endpoint may fall back to older EIA/FRED spot observations. Always inspect as-of times and instrument descriptions.
