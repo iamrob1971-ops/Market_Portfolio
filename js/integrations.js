@@ -34,10 +34,11 @@ const requestGapMs=1500;
 const delay=ms=>new Promise(resolve=>setTimeout(resolve,ms));
 const textStatus=(completed,total,good,failed,detail)=>status(completed+" of "+total+" tickers checked · "+good+" prices · "+failed+" unavailable"+(detail?" · "+detail:""));
 el("fh-stop").onclick=()=>{stopRequested=true;status("Stop requested. Completing the active request, then displaying retrieved quotes.")};
+const changeText=q=>q.ok&&Number.isFinite(q.previousClose)&&q.previousClose>0?M(q.price-q.previousClose)+" ("+((q.price-q.previousClose)/q.previousClose*100).toFixed(2)+"%)":"—";
 function showQuotePreview(){
  let good=quotes.filter(q=>q.ok).length,bad=quotes.length-good;
  el("fh-table").className="tablewrap";
- el("fh-table").innerHTML='<table><thead><tr><th>Use</th><th>Symbol</th><th>Price USD</th><th>Quote timestamp</th><th>Status</th></tr></thead><tbody>'+quotes.map(q=>'<tr><td>'+(q.ok?'<input style="width:auto" type="checkbox" data-sym="'+E(q.symbol)+'" checked>':'—')+'</td><td>'+E(q.symbol)+'</td><td>'+(q.ok?M(q.price):'—')+'</td><td>'+E(q.asof||'—')+'</td><td>'+E(q.error||(q.ageHours>24?"Possibly stale — inspect":"Review"))+'</td></tr>').join("")+'</tbody></table>';
+ el("fh-table").innerHTML='<table><thead><tr><th>Use</th><th>Symbol</th><th>Current / last</th><th>Previous close</th><th>Change</th><th>Quote timestamp</th><th>Status</th></tr></thead><tbody>'+quotes.map(q=>'<tr><td>'+(q.ok?'<input style="width:auto" type="checkbox" data-sym="'+E(q.symbol)+'" checked>':'—')+'</td><td>'+E(q.symbol)+'</td><td>'+(q.ok?M(q.price):'—')+'</td><td>'+(q.ok&&q.previousClose>0?M(q.previousClose):'—')+'</td><td>'+changeText(q)+'</td><td>'+E(q.asof||'—')+'</td><td>'+E(q.error||(q.ageHours>24?"Possibly stale — inspect":"Review"))+'</td></tr>').join("")+'</tbody></table>';
  el("fh-apply").disabled=!good;
  textStatus(quotes.length,refreshTargetCount,good,bad,stopRequested?"Stopped early; available results shown":"Review retrieved prices before applying");
 }
@@ -88,7 +89,7 @@ el("fh-refresh").onclick=async()=>{
      if(!response.ok)throw Error("HTTP "+response.status);
      const j=await response.json(),price=Number(j.c),ts=Number(j.t);
      if(!(price>0)||!(ts>0))throw Error("No valid quote / symbol not covered");
-     quotes.push({symbol,price,asof:new Date(ts*1000).toISOString(),source:"Finnhub",ok:true,ageHours:(Date.now()-ts*1000)/3600000});
+     quotes.push({symbol,price,previousClose:Number(j.pc)>0?Number(j.pc):null,asof:new Date(ts*1000).toISOString(),source:"Finnhub",ok:true,ageHours:(Date.now()-ts*1000)/3600000});
      complete=true;
     }catch(e){
      const message=e?.name==="AbortError"?"Request timed out":(e instanceof TypeError?"Browser/network request blocked":String(e.message||e));
@@ -107,8 +108,8 @@ el("fh-apply").onclick=async()=>{
  if(!confirm("Apply "+selected.length+" Finnhub prices across matching USD holdings? Share quantities and cost basis will not change."))return;
  let changed=0;
  for(let q of selected){
-  for(let h of state.holdings.filter(h=>h.symbol.toUpperCase()===q.symbol&&h.kind!=="money"&&(!h.currency||h.currency==="USD"))){h.price=q.price;h.marketValue=null;h.quoteSource=q.source;h.quoteAsOf=q.asof;changed++}
-  state.quoteHistory.push({id:uid(),symbol:q.symbol,price:q.price,asof:q.asof,currency:"USD",source:q.source,importedAt:new Date().toISOString()});
+  for(let h of state.holdings.filter(h=>h.symbol.toUpperCase()===q.symbol&&h.kind!=="money"&&(!h.currency||h.currency==="USD"))){h.price=q.price;h.marketValue=null;h.previousClose=q.previousClose>0?q.previousClose:null;h.quoteSource=q.source;h.quoteAsOf=q.asof;changed++}
+  state.quoteHistory.push({id:uid(),symbol:q.symbol,price:q.price,previousClose:q.previousClose??null,asof:q.asof,currency:"USD",source:q.source,importedAt:new Date().toISOString()});
  }
  await save();quotes=[];el("fh-apply").disabled=true;el("fh-table").innerHTML='<div class="empty">Quotes applied. Fetch again to refresh.</div>';toast(changed+" positions updated");
 };
@@ -156,10 +157,10 @@ el("gateway-login").onclick=()=>{try{window.open(gatewayBase()+"/.auth/login/aad
 el("gateway-fetch").onclick=async()=>{
  let ss=symbols().slice(0,20);if(!ss.length)return alert("No eligible tickers.");el("gateway-result").textContent="Fetching up to 20 symbols via Azure...";
  try{
-  let result=await gatewayRequest("quotes",{symbols:ss});quotes=ss.map(symbol=>{let q=result.quotes?.find(z=>z.symbol===symbol);if(q&&Number(q.price)>0&&q.currency==="USD"&&Number.isFinite(Date.parse(q.asof))){return {symbol,price:Number(q.price),asof:q.asof,source:q.source||"Azure Finnhub",ok:true,ageHours:(Date.now()-Date.parse(q.asof))/3600000}}return {symbol,ok:false,error:q?.error||"No quote"}});
+  let result=await gatewayRequest("quotes",{symbols:ss});quotes=ss.map(symbol=>{let q=result.quotes?.find(z=>z.symbol===symbol);if(q&&Number(q.price)>0&&q.currency==="USD"&&Number.isFinite(Date.parse(q.asof))){return {symbol,price:Number(q.price),previousClose:Number(q.previousClose)>0?Number(q.previousClose):null,asof:q.asof,source:q.source||"Azure Finnhub",ok:true,ageHours:(Date.now()-Date.parse(q.asof))/3600000}}return {symbol,ok:false,error:q?.error||"No quote"}});
   const good=quotes.filter(q=>q.ok).length;
   el("fh-table").className="tablewrap";
-  el("fh-table").innerHTML='<table><thead><tr><th>Use</th><th>Symbol</th><th>Price USD</th><th>Timestamp</th><th>Status</th></tr></thead><tbody>'+quotes.map(q=>'<tr><td>'+(q.ok?'<input style="width:auto" type="checkbox" data-sym="'+E(q.symbol)+'" checked>':'—')+'</td><td>'+E(q.symbol)+'</td><td>'+(q.ok?M(q.price):'—')+'</td><td>'+E(q.asof||'—')+'</td><td>'+E(q.error||(q.ageHours>24?"Possibly stale":"Review"))+'</td></tr>').join("")+'</tbody></table>';
+  el("fh-table").innerHTML='<table><thead><tr><th>Use</th><th>Symbol</th><th>Current / last</th><th>Previous close</th><th>Change</th><th>Timestamp</th><th>Status</th></tr></thead><tbody>'+quotes.map(q=>'<tr><td>'+(q.ok?'<input style="width:auto" type="checkbox" data-sym="'+E(q.symbol)+'" checked>':'—')+'</td><td>'+E(q.symbol)+'</td><td>'+(q.ok?M(q.price):'—')+'</td><td>'+E(q.asof||'—')+'</td><td>'+E(q.error||(q.ageHours>24?"Possibly stale":"Review"))+'</td></tr>').join("")+'</tbody></table>';
   el("fh-apply").disabled=!good;el("gateway-result").textContent=good+" / "+ss.length+" valid quotes; review before applying";
  }catch(e){el("gateway-result").textContent=e.message}
 };
