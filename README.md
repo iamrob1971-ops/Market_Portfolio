@@ -74,6 +74,19 @@ Go to **Import & Backup → Research Quote Intake**.
 Quote intake currently accepts USD and valid ISO 8601 timestamps with timezones. AI-generated market data is **unverified** and may be inaccurate or stale; do not treat it as a real-time feed. This does not automatically call Gemini or require an API key. Free-tier quote API providers can be integrated later via Azure Functions.
 
 
+## Previous-close comparison and daily movement
+
+Finnhub's existing `GET /quote` response provides current/last price (`c`), previous session closing price (`pc`), change (`d`), and percent change (`dp`). The browser app calculates change from `c - pc` and `(c / pc - 1) × 100` so **no additional Finnhub requests** are needed.
+
+After **Refresh All → Review → Apply selected prices**:
+
+- **Price Refresh** shows Current/Last, Previous Close, and Change per share.
+- **Holdings** shows Last Price, Previous Close, Day Change per share, and Position Day Change (shares × per-share change).
+- **Dashboard** displays Daily Price Change for *covered holdings only*, with its percentage weighted by the prior-close values of those covered positions.
+- Previous close is saved along with quote source and timestamp in IndexedDB / JSON backups. Older manual/imported rows without this field show a dash rather than an invented comparison.
+
+**Important:** The quoted prior close is the previous trading session's close relative to the provider's quote, not an arbitrary historical date. Quotes may be stale or delayed. The portfolio daily change excludes cash, unmatched/missing-price holdings, pending adjustments and flows, and it is **not** a cash-flow-adjusted investment return. All portfolio values remain user-entered or quote-imported; no brokerage balances are fetched.
+
 ## New: Free quote refresh (manual, review before apply)
 
 Go to **Price Refresh**.
