@@ -3,13 +3,7 @@
 const E=esc,M=money,el=id=>document.getElementById(id);
 let quotes=[],busy=false,stopRequested=false,lastStart=0;
 function scoped(all){let aa=all?state.accounts:accounts(),hs=state.holdings.filter(h=>aa.some(a=>a.id===h.accountId));return {aa,hs,t:totals(aa)}}
-const headerChoices=[
- {symbol:"SPY",label:"S&P 500",sub:"SPY · ETF proxy"},
- {symbol:"DIA",label:"Dow Jones",sub:"DIA · ETF proxy"},
- {symbol:"QQQ",label:"Nasdaq-100",sub:"QQQ · ETF proxy; not Nasdaq Composite"},
- {symbol:"IWM",label:"Russell 2000",sub:"IWM · ETF proxy"},
- {symbol:"TLT",label:"Long Treasuries",sub:"TLT · bond ETF proxy; not Treasury yield"}
-];
+const headerChoices=[]; // Actual major indexes are now sourced separately; no ETF substitutes.
 function selectedHeaderSymbols(){const allowed=new Set(headerChoices.map(c=>c.symbol));return Array.isArray(state.headerWatch)?state.headerWatch.filter(s=>allowed.has(s)):headerChoices.map(c=>c.symbol)}
 function portfolioSymbols(){return [...new Set(scoped(false).hs.filter(h=>h.kind!=="money"&&(!h.currency||h.currency==="USD")&&/^[A-Z][A-Z0-9.-]{0,14}$/.test(h.symbol.toUpperCase())).map(h=>h.symbol.toUpperCase()))].sort()}
 function symbols(){return [...new Set([...portfolioSymbols(),...selectedHeaderSymbols()])].sort()}
@@ -45,6 +39,7 @@ const headerSettings=document.createElement("div");
 headerSettings.className="card";
 headerSettings.innerHTML='<h2>Market Overview Header</h2><p>Select which market references to show at the top of the dashboard. These are ETF share prices—not direct index levels, metal spot prices, oil/barrel or Treasury yields.</p><div id="marketHeaderOptions" class="grid"></div><p class="muted" id="refreshCounts"></p><small>The Finnhub indicators are ETF proxies; gold and silver use separate spot feeds, and WTI uses a labeled oil reference. These other providers do not count toward Finnhub requests. Quotes are locally saved; Finnhub prices are applied only after review.</small>';
 el("live-prices").append(headerSettings);
+headerSettings.style.display="none"; // Hide retired ETF benchmark selection controls.
 headerSettings.addEventListener("change",async event=>{
  const input=event.target.closest("[data-header-symbol]");
  if(!input)return;
