@@ -35,6 +35,11 @@ header h1{font-size:22px;margin:0}header small{color:#b6c8da}main{max-width:1280
 <div class="actions"><button id="copyTickers" class="btn secondary">Copy tickers</button><button id="copyGemini" class="btn secondary">Copy Gemini prompt</button></div>
 <label>Quote CSV: symbol,price,currency,asof,source</label><textarea id="quoteText" placeholder="symbol,price,currency,asof,source&#10;AAPL,250.00,USD,2026-11-20T16:00:00-05:00,Research source"></textarea><div class="actions"><button id="previewQuotes" class="btn secondary">Preview quotes</button><button id="applyQuotes" class="btn" disabled>Apply prices</button></div><div id="quotePreview"></div><small>USD only in this version. Dates, sources and currencies must be supplied. No account numbers or quantities are shared by the copy buttons.</small></div><div class="card"><h2>Import Holdings from CSV</h2><p>Required columns: <code>account, symbol, quantity, basis, price</code>. Account must match an existing account label (unique labels recommended). CSV imports update matching holdings only after review.</p><textarea id="csvText" placeholder="account,symbol,quantity,basis,price&#10;Roth IRA,SCHD,100,2500,27.50"></textarea><div class="actions"><button id="previewCsv" class="btn secondary">Preview CSV</button><button id="applyCsv" class="btn" disabled>Apply approved rows</button></div><div id="csvPreview"></div></div><div class="card"><h2>Local Backup</h2><p>Download a JSON backup regularly. Clearing browser data or switching devices can erase the local database.</p><div class="actions"><button id="backup" class="btn">Export full JSON backup</button><label style="margin:0">Restore JSON<input type="file" id="restore" accept=".json,application/json"></label></div><small>Restoring a backup replaces all current local records after confirmation.</small></div><div class="card"><h2>Future Connections</h2><p>Schwab via authenticated Azure Function; IBKR as an optional secondary provider; SharePoint sync later. No keys, account credentials, or trading functionality in this version.</p></div></section>
 </main><div id="toast" role="status"></div><footer>Market Portfolio v1 · Personal tracking only · Financial amounts are derived from your entries</footer>
+<style>
+.holdings-sort{border:0;background:transparent;color:inherit;font:inherit;font-weight:inherit;cursor:pointer;text-align:left;white-space:nowrap;padding:2px 4px;}
+.holdings-sort:hover{text-decoration:underline;}
+.holdings-sort:focus-visible{outline:2px solid #2563eb;outline-offset:2px;border-radius:3px;}
+</style>
 <script>
 "use strict";
 const $=id=>document.getElementById(id),uid=()=>crypto.randomUUID?crypto.randomUUID():"id-"+Date.now()+"-"+Math.random().toString(36).slice(2);
@@ -42,6 +47,39 @@ const money=n=>Number(n||0).toLocaleString("en-US",{style:"currency",currency:"U
 const esc=s=>String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 const blank=()=>({version:1,owners:[{id:"me",name:"Me",primary:true},{id:"mom",name:"Mom",primary:false},{id:"children",name:"Children",primary:false}],accounts:[],holdings:[],cash:[],dividends:[],market:[],snapshots:[],baskets:[],pendingAdjustments:[],reconciliations:[],transactions:[],quoteHistory:[]});
 let state=blank(),db,filter="mine",staged=null,stagedQuotes=null;
+let holdingsSort={key:null,direction:"asc"};
+const holdingsSortColumns={Ticker:"ticker",Shares:"shares","Day Change":"dayPct","Market Value":"marketValue","Unrealized P&L":"pnl"};
+function sortedHoldings(rows){
+ if(!holdingsSort.key)return rows;
+ const get=(h)=>{switch(holdingsSort.key){
+  case "ticker":return String(h.symbol||"").toUpperCase();
+  case "shares":return Number(h.quantity);
+  case "dayPct":return Number(h.previousClose)>0?(Number(h.price)-Number(h.previousClose))/Number(h.previousClose)*100:null;
+  case "marketValue":return value(h);
+  case "pnl":return profit(h);
+  default:return null;
+ }};
+ return rows.map((h,i)=>({h,i})).sort((a,b)=>{
+  const av=get(a.h),bv=get(b.h);
+  const missing=v=>v===null||v===undefined||(typeof v==="number"&&!Number.isFinite(v));
+  if(missing(av)!==missing(bv))return missing(av)?1:-1;
+  if(missing(av))return a.i-b.i;
+  const result=typeof av==="string"?av.localeCompare(bv):av-bv;
+  return (holdingsSort.direction==="asc"?result:-result)||(a.i-b.i);
+ }).map(x=>x.h);
+}
+function holdingsTable(headers,rows){
+ let html=table(headers,rows);
+ for(const [heading,key] of Object.entries(holdingsSortColumns)){
+  const active=holdingsSort.key===key;
+  const direction=active?holdingsSort.direction:null;
+  const indicator=active?(direction==="asc"?" ▲":" ▼"):" ⇅";
+  const accessibility=active?' aria-sort="'+(direction==="asc"?"ascending":"descending")+'"':'';
+  html=html.replace("<th>"+heading+"</th>",'<th'+accessibility+'><button type="button" class="holdings-sort" data-holdings-sort="'+key+'" aria-label="Sort by '+heading+'">'+heading+indicator+'</button></th>');
+ }
+ return html;
+}
+
 function toast(s){$("toast").textContent=s;$("toast").style.display="block";setTimeout(()=>$("toast").style.display="none",2600)}
 function indexedDBOpen(){return new Promise((res,rej)=>{const request=indexedDB.open("MarketPortfolioV1",1);request.onupgradeneeded=()=>request.result.createObjectStore("store");request.onsuccess=()=>res(request.result);request.onerror=()=>rej(request.error)})}
 async function load(){db=await indexedDBOpen();const result=await new Promise((res,rej)=>{let q=db.transaction("store","readonly").objectStore("store").get("data");q.onsuccess=()=>res(q.result);q.onerror=()=>rej(q.error)});if(result&&result.version===1)state={...blank(),...result};render()}
@@ -81,10 +119,19 @@ function render(){
  selectOptions($("accountOwner"),state.owners,x=>x.name);selectOptions($("holdingAccount"),state.accounts,label);selectOptions($("cashAccount"),state.accounts,label);selectOptions($("divHolding"),state.holdings,x=>x.symbol+" — "+label(state.accounts.find(a=>a.id===x.accountId)));
  $("ownerList").innerHTML=table(["Owner","My portfolio?","Action"],state.owners.map(x=>'<tr>'+td(esc(x.name))+td(x.primary?"Yes":"No")+td(x.id==="me"?"Default":b("toggleOwner",x.id,x.primary?"Exclude":"Include"))+'</tr>'));
  $("accountsTable").innerHTML=table(["Owner","Broker","Label","Type","Value","Action"],state.accounts.map(a=>'<tr>'+td(esc(state.owners.find(o=>o.id===a.ownerId)?.name||"Unknown"))+td(esc(a.broker))+td(esc(a.name))+td(esc(a.type))+td(money(totals([a]).total))+td(b("deleteAccount",a.id,"Delete"))+'</tr>'));
- $("holdingsTable").innerHTML=table(["Account","Ticker","Shares","Last Price","Previous Close","Day Change","Position Day Change","Market Value","Basis","Unrealized P&L","Action"],hs.map(h=>'<tr>'+td(esc(label(state.accounts.find(a=>a.id===h.accountId))))+td('<strong>'+esc(h.symbol)+'</strong>'+(h.kind==="money"?' <span class="pill">Money fund</span>':""))+td(num(h.quantity))+td(money(h.price))+td(Number(h.previousClose)>0?money(h.previousClose):"—")+td(Number(h.previousClose)>0?'<span class="'+(h.price>=h.previousClose?"positive":"negative")+'">'+money(h.price-h.previousClose)+' ('+pct((h.price-h.previousClose)/h.previousClose*100)+')</span>':"—")+td(Number(h.previousClose)>0?'<span class="'+(h.price>=h.previousClose?"positive":"negative")+'">'+money((h.price-h.previousClose)*h.quantity)+'</span>':"—")+td(money(value(h)))+td(money(h.basis))+td('<span class="'+(profit(h)>=0?"positive":"negative")+'">'+money(profit(h))+'</span>')+td(b("deleteHolding",h.id,"Delete"))+'</tr>'));
+ $("holdingsTable").innerHTML=holdingsTable(["Account","Ticker","Shares","Last Price","Previous Close","Day Change","Position Day Change","Market Value","Basis","Unrealized P&L","Action"],sortedHoldings(hs).map(h=>'<tr>'+td(esc(label(state.accounts.find(a=>a.id===h.accountId))))+td('<strong>'+esc(h.symbol)+'</strong>'+(h.kind==="money"?' <span class="pill">Money fund</span>':""))+td(num(h.quantity))+td(money(h.price))+td(Number(h.previousClose)>0?money(h.previousClose):"—")+td(Number(h.previousClose)>0?'<span class="'+(h.price>=h.previousClose?"positive":"negative")+'">'+money(h.price-h.previousClose)+' ('+pct((h.price-h.previousClose)/h.previousClose*100)+')</span>':"—")+td(Number(h.previousClose)>0?'<span class="'+(h.price>=h.previousClose?"positive":"negative")+'">'+money((h.price-h.previousClose)*h.quantity)+'</span>':"—")+td(money(value(h)))+td(money(h.basis))+td('<span class="'+(profit(h)>=0?"positive":"negative")+'">'+money(profit(h))+'</span>')+td(b("deleteHolding",h.id,"Delete"))+'</tr>'));
  $("dividendTable").innerHTML='<div class="grid"><div class="card"><small>Annual income · current selection</small><div class="metric">'+money(t.income)+'</div></div><div class="card"><small>Average monthly equivalent</small><div class="metric">'+money(t.income/12)+'</div></div></div>'+table(["Account","Ticker","Distribution/share","Frequency","Annual Est.","Next date","Action"],hs.filter(h=>state.dividends.some(d=>d.holdingId===h.id)).map(h=>{let d=state.dividends.find(d=>d.holdingId===h.id);return '<tr>'+td(esc(label(state.accounts.find(a=>a.id===h.accountId))))+td(esc(h.symbol))+td(money(d.perShare))+td(num(d.frequency)+"/yr")+td(money(dividends(h)))+td(esc(d.nextDate||"Unknown"))+td(b("deleteDividend",d.id,"Delete"))+'</tr>'}));
  $("marketTable").innerHTML=table(["Indicator","Value","Daily %","Updated","Action"],state.market.map(x=>'<tr>'+td(esc(x.symbol))+td(num(x.value)+" "+esc(x.units))+td(pct(x.change))+td(esc(x.updated.slice(0,16).replace("T"," ")))+td(b("deleteMarket",x.id,"Delete"))+'</tr>'))
 }
+document.addEventListener("click",event=>{
+ const button=event.target.closest("[data-holdings-sort]");
+ if(!button)return;
+ const key=button.dataset.holdingsSort;
+ if(!Object.values(holdingsSortColumns).includes(key))return;
+ if(holdingsSort.key===key)holdingsSort.direction=holdingsSort.direction==="asc"?"desc":"asc";
+ else {holdingsSort.key=key;holdingsSort.direction=key==="ticker"?"asc":"desc";}
+ render();
+});
 document.querySelectorAll("[data-tab]").forEach(x=>x.addEventListener("click",()=>tab(x.dataset.tab)));document.querySelectorAll("[data-tab-go]").forEach(x=>x.addEventListener("click",()=>tab(x.dataset.tabGo)));
 function tab(name){document.querySelectorAll(".tab").forEach(x=>x.classList.toggle("show",x.id===name));document.querySelectorAll("nav button").forEach(x=>x.classList.toggle("active",x.dataset.tab===name))}
 $("ownerFilter").addEventListener("change",e=>{filter=e.target.value;render()});$("recalculate").onclick=()=>{render();toast("Recalculated from saved manual data")};
