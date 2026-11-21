@@ -74,26 +74,31 @@ Go to **Import & Backup → Research Quote Intake**.
 Quote intake currently accepts USD and valid ISO 8601 timestamps with timezones. AI-generated market data is **unverified** and may be inaccurate or stale; do not treat it as a real-time feed. This does not automatically call Gemini or require an API key. Free-tier quote API providers can be integrated later via Azure Functions.
 
 
-## Unified market header and holdings refresh
+## Market overview: gold and silver spot plus WTI market reference
 
-The dashboard now includes a configurable **Market Overview** row populated from the **same reviewed Finnhub quote refresh** as portfolio holdings. Open **Price Refresh → Market Overview Header** to choose up to eight predefined US ETF proxies:
+The dashboard Market Overview now displays independently sourced **spot gold** and **spot silver** quotes in **USD per troy ounce** from [Gold-API](https://gold-api.com/docs), plus a **WTI crude reference** in **USD per barrel** from [AmericasOilWatch](https://americasoilwatch.com/api). The latter is typically a quoted **front-month futures contract**, **not the official physical Cushing WTI spot price**, and the tile identifies the provider and reference type. The oil endpoint may fall back to older EIA/FRED spot observations. Always inspect as-of times and instrument descriptions.
+
+To avoid substituting inaccurate ETF values for commodity spot prices, GLD, SLV, and USO have been removed from the *market indicator header*. They remain eligible holdings if you actually own them. The other optional Finnhub header indicators remain:
 
 | Label | Symbol | Meaning |
 | --- | --- | --- |
-| S&P 500 | SPY | ETF share price, **not** the S&P 500 index level |
-| Dow Jones | DIA | Dow Jones ETF share price, **not** the index level |
-| Nasdaq-100 | QQQ | ETF tracking Nasdaq-100, **not** Nasdaq Composite |
+| S&P 500 | SPY | ETF share price, **not** index level |
+| Dow Jones | DIA | ETF share price, **not** index level |
+| Nasdaq-100 | QQQ | ETF share price, **not** Nasdaq Composite |
 | Russell 2000 | IWM | ETF share price, **not** index level |
-| Gold | GLD | Gold trust ETF, **not** spot gold/oz |
-| Silver | SLV | Silver trust ETF, **not** spot silver/oz |
-| Oil | USO | Oil futures-linked ETF, **not** the WTI spot price per barrel |
-| Long Treasuries | TLT | Treasury bond ETF, **not** the 10-year Treasury yield |
+| Long Treasuries | TLT | Bond ETF share price, **not** Treasury yield |
 
-These market tiles show the ETF's own USD share price and previous-close change, with as-of timestamps. If Finnhub does not return a quote, the tile remains blank or retains a previously saved reading; the app does **not** substitute an invented index level or commodity price.
+**Refresh behavior:**
+- **Refresh All — Preview Quotes** retrieves all eligible portfolio and optional header ETF symbols through Finnhub, deduplicated and paced at a minimum 1.5 seconds between request starts (maximum approximately 40/minute).
+- The same button **also starts** the independent Gold-API (two requests) and AmericasOilWatch (one request) fetch. Or use **Refresh Gold, Silver & WTI** separately without a Finnhub key.
+- Spot/reference requests **do not use Finnhub's quota**. Each provider is checked at most once per 60 seconds per open tab. Market spot/reference values save locally after validation; portfolio positions are not altered.
+- Finnhub quotes are still **previewed and explicitly applied** before changing holdings or existing Finnhub header ETF quotes.
+- Spot gold/silver quote endpoints do **not** supply an authenticated comparable previous-day close in the free response, so no day-over-day change is invented. WTI change is shown only when the upstream response supplies one.
+- On request failure, the prior saved value (if any) remains; it is accompanied by its original timestamp. The app does not infer a fresh price when none was delivered.
 
-**One refresh, one request per unique ticker.** The refresh engine takes the union of holdings tickers in the selected owner view and enabled header symbols. If SPY is held in an account and appears in the header, it is requested once, then applied in both places. Example: 30 unique portfolio tickers + 8 enabled header tickers − 2 overlaps = **36 quote requests**. The app paces starts at a minimum 1.5 seconds apart (about 40/minute) and handles HTTP 429 with cooldown. Toggling the header preferences saves them in local IndexedDB; it never changes account ownership, holding quantities, cost basis, or basket membership.
+For actual **WTI Cushing spot assessments**, the authoritative free source is the [U.S. Energy Information Administration](https://www.eia.gov/opendata/), which requires free API registration and generally reports assessed data later than an intraday futures market. The current no-key WTI card is labeled as a market reference, not guaranteed physical spot.
 
-This initial version does not retrieve direct index levels, commodity spot prices, or Treasury yields. Those require verified source-specific endpoint coverage and entitlement checks. The header quote values are persisted only after using **Apply selected prices**.
+These sources are publicly accessible but not guaranteed available or accurate at every refresh; validate usage terms, quote age, and availability before relying on the numbers.
 
 ## Previous-close comparison and daily movement
 
