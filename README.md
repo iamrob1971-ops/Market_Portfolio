@@ -74,6 +74,27 @@ Go to **Import & Backup → Research Quote Intake**.
 Quote intake currently accepts USD and valid ISO 8601 timestamps with timezones. AI-generated market data is **unverified** and may be inaccurate or stale; do not treat it as a real-time feed. This does not automatically call Gemini or require an API key. Free-tier quote API providers can be integrated later via Azure Functions.
 
 
+## Unified market header and holdings refresh
+
+The dashboard now includes a configurable **Market Overview** row populated from the **same reviewed Finnhub quote refresh** as portfolio holdings. Open **Price Refresh → Market Overview Header** to choose up to eight predefined US ETF proxies:
+
+| Label | Symbol | Meaning |
+| --- | --- | --- |
+| S&P 500 | SPY | ETF share price, **not** the S&P 500 index level |
+| Dow Jones | DIA | Dow Jones ETF share price, **not** the index level |
+| Nasdaq-100 | QQQ | ETF tracking Nasdaq-100, **not** Nasdaq Composite |
+| Russell 2000 | IWM | ETF share price, **not** index level |
+| Gold | GLD | Gold trust ETF, **not** spot gold/oz |
+| Silver | SLV | Silver trust ETF, **not** spot silver/oz |
+| Oil | USO | Oil futures-linked ETF, **not** the WTI spot price per barrel |
+| Long Treasuries | TLT | Treasury bond ETF, **not** the 10-year Treasury yield |
+
+These market tiles show the ETF's own USD share price and previous-close change, with as-of timestamps. If Finnhub does not return a quote, the tile remains blank or retains a previously saved reading; the app does **not** substitute an invented index level or commodity price.
+
+**One refresh, one request per unique ticker.** The refresh engine takes the union of holdings tickers in the selected owner view and enabled header symbols. If SPY is held in an account and appears in the header, it is requested once, then applied in both places. Example: 30 unique portfolio tickers + 8 enabled header tickers − 2 overlaps = **36 quote requests**. The app paces starts at a minimum 1.5 seconds apart (about 40/minute) and handles HTTP 429 with cooldown. Toggling the header preferences saves them in local IndexedDB; it never changes account ownership, holding quantities, cost basis, or basket membership.
+
+This initial version does not retrieve direct index levels, commodity spot prices, or Treasury yields. Those require verified source-specific endpoint coverage and entitlement checks. The header quote values are persisted only after using **Apply selected prices**.
+
 ## Previous-close comparison and daily movement
 
 Finnhub's existing `GET /quote` response provides current/last price (`c`), previous session closing price (`pc`), change (`d`), and percent change (`dp`). The browser app calculates change from `c - pc` and `(c / pc - 1) × 100` so **no additional Finnhub requests** are needed.
