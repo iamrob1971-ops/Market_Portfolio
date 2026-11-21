@@ -1,3 +1,9 @@
+## FMP index testing and remembered browser keys (Nov 2026)
+
+The **Actual Indexes** tab now tests the three *individual* FMP \`/stable/quote?symbol=...\` endpoints rather than the unavailable \`/stable/batch-index-quotes\` endpoint. Click **Test once** at any hour to check whether your key can return \`^DJI\`, \`^GSPC\` and \`^IXIC\`. The experimental automatic mode runs only while the page is visible during regular US market hours, with a default 6-minute interval, three API calls per cycle, and a conservative 210-request local daily ceiling. A rejected or incomplete response stops automatic requests. The free plan may not authorize index data; 402 is reported explicitly.
+
+For the Finnhub and FMP API fields, keys now survive reloads in the **same browser tab** via sessionStorage. Each field also has a separate optional **Remember key on this device** checkbox for localStorage persistence across browser sessions and a **Forget key** button. Key storage is not encrypted and is accessible to scripts/extensions running on the same origin. **Never enable persistent remembering on shared devices**, and prefer a secured Azure gateway for long-term credentials. Keys are not included in the GitHub repository, portfolio IndexedDB database, or JSON backup exports.
+
 # Market Portfolio — Manual Edition (v1)
 
 Personal, local-first stock market and portfolio dashboard. Hosted as a static GitHub Pages HTML application. **Do not commit actual holdings, statements, personal account numbers, API keys, credentials, or JSON backups to this public repository.**
