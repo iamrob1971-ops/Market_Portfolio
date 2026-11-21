@@ -10,6 +10,8 @@ Personal, local-first stock market and portfolio dashboard. Hosted as a static G
 - Cash balance tracking without double-counting money market fund positions.
 - Manual market-index/commodity indicators, shown as manual data.
 - Dividend profiles and estimated annual income.
+- Cross-account basket creation, tagging, and aggregate basket reports.
+- Imported statement market values and pending adjustments, with 401(k)/BrokerageLink reconciliation.
 - On-demand portfolio recalculation and historical valuation snapshots.
 - CSV holdings import preview and manual approval.
 - JSON export/restore backups and holdings CSV export.
@@ -33,6 +35,22 @@ Until Pages is enabled, the repository's `index.html` can be downloaded and run 
 7. Use **Import & Backup → Export full JSON backup** regularly.
 
 The Owner dropdown defaults to *My Portfolio*, which includes only owner groups flagged as included. Select *Mom* or *All Portfolios* for separate monitoring/oversight. Account owners are reporting groups, not a representation of legal title.
+
+## Import the reconciled Fidelity November 20, 2026 data
+
+The private import file is delivered separately through the ChatGPT conversation. **Do not upload this JSON file or your raw Fidelity CSV statements into this public GitHub repository.**
+
+1. Open the published app in the same browser/device you will use for managing the portfolio.
+2. Open **Import & Backup**, then **Export full JSON backup** first if you already entered any accounts or holdings.
+3. Under **Restore JSON**, choose the `Market_Portfolio_Fidelity_Import_2026-11-20.json` file downloaded from the conversation.
+4. Confirm the replacement. This replaces current browser data; it does not merge. The app then shows the imported Fidelity accounts, positions, pending adjustments and baskets.
+5. Select **My Portfolio** for the imported Fidelity overview, then **Baskets** to see grouped investments across accounts.
+
+The private import includes four account views: joint taxable brokerage, traditional IRA, 401(k) core holdings, and 401(k) BrokerageLink. The 401(k) plan's summary BrokerageLink line is excluded because the linked account is imported at the detail level. A separate duplicate BrokerageLink CSV is also excluded.
+
+The statements include pending adjustments and a mismatch between the 401(k)'s BrokerageLink summary line and linked-account detail; those are displayed separately under Dashboard → Statement Reconciliation, rather than silently netted into investment positions.
+
+**Baskets are cross-account grouping tags.** A basket may include holdings from taxable brokerage, IRAs, and other accounts, but basket membership never changes account ownership, tax status, or account-level performance calculations. Each Fidelity source row is preserved separately to avoid collapsing distinct cash/margin lots of the same ticker.
 
 ## CSV import
 
