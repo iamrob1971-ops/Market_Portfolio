@@ -45,7 +45,7 @@ app.http("quotes", {
           if (!response.ok) { results.push({ symbol, error: "Provider HTTP " + response.status }); continue; }
           const q = await response.json();
           if (!(Number(q.c) > 0) || !(Number(q.t) > 0)) { results.push({ symbol, error: "No valid quote" }); continue; }
-          results.push({ symbol, price: Number(q.c), asof: new Date(Number(q.t) * 1000).toISOString(), currency: "USD", source: "Finnhub" });
+          results.push({ symbol, price: Number(q.c), previousClose: Number(q.pc) > 0 ? Number(q.pc) : null, asof: new Date(Number(q.t) * 1000).toISOString(), currency: "USD", source: "Finnhub" });
         } catch (e) { results.push({ symbol, error: "Quote unavailable" }); }
         // conservative default for free quotas; do not use this for streaming.
         await new Promise(resolve => setTimeout(resolve, 1100));
