@@ -74,6 +74,16 @@ Go to **Import & Backup → Research Quote Intake**.
 Quote intake currently accepts USD and valid ISO 8601 timestamps with timezones. AI-generated market data is **unverified** and may be inaccurate or stale; do not treat it as a real-time feed. This does not automatically call Gemini or require an API key. Free-tier quote API providers can be integrated later via Azure Functions.
 
 
+## Actual US indexes: TradingView hosted widget
+
+The Dashboard embeds TradingView's free branded **Market Data / Market Quotes** widget with the actual index symbols **DJ:DJI** (Dow Jones Industrial Average), **SP:SPX** (S&P 500) and **NASDAQ:IXIC** (Nasdaq Composite). These are **index point levels**, not SPY/DIA/QQQ ETF share prices and not Nasdaq-100.
+
+- TradingView hosts and updates the display while the dashboard is open; it **does not** consume Finnhub or FMP API calls, or require us to poll these three values every two minutes.
+- Market-data timeliness is controlled by TradingView and each exchange. Free official index feeds can be delayed (for example, TradingView's coverage page lists delayed Dow Jones and Nasdaq index data). Never label this embedded widget as guaranteed real-time.
+- Keep TradingView branding and attribution. Widget values are isolated from portfolio holdings and calculations (there is no supported API for harvesting the widget's internal data).
+- A browser blocker or provider widget outage can prevent display. The widget has an external link to TradingView's US-index quotes.
+- The older **Actual Indexes** FMP test remains available as an optional experimental separate tab but its duplicate Dashboard card is hidden. Free FMP access previously returned HTTP 402, so leave automatic polling off.
+
 ## Focus watchlists and visible-only market updates
 
 There are two **separate** live features, neither of which places orders or syncs with brokerage accounts.
