@@ -80,12 +80,12 @@ Go to **Price Refresh**.
 
 1. Create a free market-data token through [Finnhub](https://finnhub.io/). Verify the service's current license/quotas for personal use.
 2. Enter that **limited market-data-only token** in the password field *in your own trusted browser*. It is held in the page's memory only; it is never written to IndexedDB, JSON backups, or GitHub. It is nevertheless visible to the client browser runtime, so use the future Azure gateway for stronger key protection.
-3. Click **Fetch quote preview**. The app requests distinct USD stock/ETF symbols for the currently selected owner view. The initial limit is 20 symbols per refresh.
-4. Review price, timestamp, coverage and possibly stale results. Uncheck anything questionable.
+3. Click **Refresh All — Preview Quotes**. The app requests all distinct eligible USD stock/ETF symbols in the currently selected owner view, spacing request starts by at least 1.5 seconds (40/minute at most in this browser tab). Use **First 10 (test)** for small trials. A Stop button ends the run after the active request.
+4. Watch the progress counter. If Finnhub reports HTTP 429, the app pauses at least 65 seconds and retries once; if rate limiting persists, it stops and keeps previously fetched previews. Review price, timestamp, coverage and possibly stale results. Uncheck anything questionable.
 5. Click **Apply selected prices**. The app updates price and quote provenance across matching positions without changing quantities, cost basis, baskets, dividends or transaction history.
 6. Use **Import & Backup → Export full JSON backup** regularly.
 
-**No live-refresh-on-page-load; no broker trades.** A free-tier API may fail due to quota, missing symbols, CORS/browser restrictions or data entitlements. Direct quote mode does not handle foreign-currency shares, index derivatives, or money-market funds. Failed quotes never overwrite older values.
+**No live-refresh-on-page-load; no broker trades.** Finnhub usage elsewhere under the same key counts toward its provider limits; spacing the requests in one browser tab cannot guarantee the provider will never return 429. A free-tier API may fail due to quota, missing symbols, CORS/browser restrictions or data entitlements. Direct quote mode does not handle foreign-currency shares, index derivatives, or money-market funds. Failed quotes never overwrite older values.
 
 ## New: Portfolio Q&A and Gemini
 
