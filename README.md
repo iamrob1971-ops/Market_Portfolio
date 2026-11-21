@@ -8,6 +8,8 @@ Personal, local-first stock market and portfolio dashboard. Hosted as a static G
 - Multiple account labels and types (brokerage, IRA, Roth IRA, joint, custodial).
 - Manual holdings with quantity, total cost basis, price, and unrealized P&L.
 - Cash balance tracking without double-counting money market fund positions.
+- Manual buy/sell transaction journal and recorded realized P&L estimates.
+- Copy ticker list/Gemini research prompt, paste researched quotes with timestamps, preview and apply.
 - Manual market-index/commodity indicators, shown as manual data.
 - Dividend profiles and estimated annual income.
 - Cross-account basket creation, tagging, and aggregate basket reports.
@@ -51,6 +53,23 @@ The private import includes four account views: joint taxable brokerage, traditi
 The statements include pending adjustments and a mismatch between the 401(k)'s BrokerageLink summary line and linked-account detail; those are displayed separately under Dashboard → Statement Reconciliation, rather than silently netted into investment positions.
 
 **Baskets are cross-account grouping tags.** A basket may include holdings from taxable brokerage, IRAs, and other accounts, but basket membership never changes account ownership, tax status, or account-level performance calculations. Each Fidelity source row is preserved separately to avoid collapsing distinct cash/margin lots of the same ticker.
+
+## Transactions (new)
+
+Go to **Transactions** and select an exact position row. Enter a BUY or SELL, quantity, execution price, date and optional note. The app updates the holding's quantity and cost basis and records the transaction in the local journal. A full sale leaves a zero-quantity position in place to preserve history; realized P&L on sales uses proportional average basis as an **estimate**, not brokerage tax-lot accounting.
+
+**Important:** Transactions do not place broker orders, adjust separate cash balances, handle fees, taxes, corporate actions or reconcile pending activity. Record cash separately from a brokerage statement. Holdings with recorded transactions cannot be overwritten through the standard manual holding form, CSV import, or deletion without first preserving the ledger.
+
+## AI-assisted price intake (new)
+
+Go to **Import & Backup → Research Quote Intake**.
+
+1. Click **Copy tickers** or **Copy Gemini prompt**. The copied request contains symbols, not holdings or balances.
+2. Ask Gemini (or a research service with current source access) for a plain CSV: `symbol,price,currency,asof,source`.
+3. Paste the CSV into the app, **Preview quotes**, check each source, timestamp and symbol, and **Apply prices**.
+4. A matching ticker is updated across all accounts without changing quantity, cost basis or transaction history. Imported quotes retain source and timestamp metadata in the local database.
+
+Quote intake currently accepts USD and valid ISO 8601 timestamps with timezones. AI-generated market data is **unverified** and may be inaccurate or stale; do not treat it as a real-time feed. This does not automatically call Gemini or require an API key. Free-tier quote API providers can be integrated later via Azure Functions.
 
 ## CSV import
 
