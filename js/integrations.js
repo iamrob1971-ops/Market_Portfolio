@@ -1,12 +1,12 @@
 (function(){
 "use strict";
 const E=esc,M=money,el=id=>document.getElementById(id);
-let quotes=[],busy=false;
+let quotes=[],busy=false,stopRequested=false,lastStart=0;
 function scoped(all){let aa=all?state.accounts:accounts(),hs=state.holdings.filter(h=>aa.some(a=>a.id===h.accountId));return {aa,hs,t:totals(aa)}}
 function symbols(){return [...new Set(scoped(false).hs.filter(h=>h.kind!=="money"&&(!h.currency||h.currency==="USD")&&/^[A-Z][A-Z0-9.-]{0,14}$/.test(h.symbol.toUpperCase())).map(h=>h.symbol.toUpperCase()))].sort()}
 const nav=document.querySelector("nav"),main=document.querySelector("main");
 function page(id,title,html){let b=document.createElement("button");b.dataset.tab=id;b.textContent=title;nav.append(b);let section=document.createElement("section");section.id=id;section.className="tab";section.innerHTML=html;main.append(section);b.addEventListener("click",()=>{document.querySelectorAll(".tab").forEach(x=>x.classList.toggle("show",x.id===id));document.querySelectorAll("nav button").forEach(x=>x.classList.toggle("active",x===b))})}
-page("live-prices","Price Refresh",'<div class="card"><h2>Price Refresh · Free API Test</h2><p>Fetch prices for saved US-listed ticker symbols through Finnhub, then review before applying. Quotes are not guaranteed real-time or complete.</p><div class="note">Enter a free, market-data-only API token for testing. It is not saved to your portfolio or GitHub. The browser-only test sends it as a Finnhub URL parameter, so the token may appear in browser/network logs. The browser token is not secret from extensions or network diagnostics. Prefer a protected Azure Function.</div><div class="formgrid"><label>Finnhub API token (session only)<input type="password" id="fh-key" autocomplete="off" placeholder="Paste your free API key"></label><label>Max tickers per request<select id="fh-max"><option value="10">10</option><option value="20" selected>20</option><option value="40">40</option></select></label></div><div class="actions"><button class="btn" id="fh-refresh">Fetch quote preview</button><button class="btn secondary" id="fh-clear">Clear API key</button><button class="btn secondary" id="fh-copy">Copy tickers</button></div><p id="fh-status" role="status" class="muted">Not connected.</p><small>This is the initial free quote connector. Azure-hosted provider credentials will replace the browser-key test when configured.</small></div><div class="card"><div class="row"><h2>Review Quotes</h2><button class="btn" id="fh-apply" disabled>Apply selected prices</button></div><div id="fh-table" class="empty">Fetch quotes to preview them.</div></div><div class="card"><h2>Quote Coverage</h2><div id="fh-coverage"></div></div>');
+page("live-prices","Price Refresh",'<div class="card"><h2>Price Refresh · Free API Test</h2><p>Fetch prices for saved US-listed ticker symbols through Finnhub, then review before applying. Quotes are not guaranteed real-time or complete.</p><div class="note">Enter a free, market-data-only API token for testing. It is not saved to your portfolio or GitHub. The browser-only test sends it as a Finnhub URL parameter, so the token may appear in browser/network logs. The browser token is not secret from extensions or network diagnostics. Prefer a protected Azure Function.</div><div class="formgrid"><label>Finnhub API token (session only)<input type="password" id="fh-key" autocomplete="off" placeholder="Paste your free API key"></label><label>Refresh mode<select id="fh-max"><option value="all" selected>All eligible tickers (recommended)</option><option value="10">First 10 (test)</option></select></label></div><div class="actions"><button class="btn" id="fh-refresh">Refresh All — Preview Quotes</button><button class="btn secondary" id="fh-stop" disabled>Stop refresh</button><button class="btn secondary" id="fh-clear">Clear API key</button><button class="btn secondary" id="fh-copy">Copy tickers</button></div><p id="fh-status" role="status" class="muted">Not connected.</p><small>All selected-owner eligible symbols are requested once, at most 40 starts per minute (1.5 seconds apart). Rate-limit responses cause a cooldown. Existing prices are never overwritten unless you approve the preview. Azure will replace the browser-key test later.</small></div><div class="card"><div class="row"><h2>Review Quotes</h2><button class="btn" id="fh-apply" disabled>Apply selected prices</button></div><div id="fh-table" class="empty">Fetch quotes to preview them.</div></div><div class="card"><h2>Quote Coverage</h2><div id="fh-coverage"></div></div>');
 page("ai-insights","AI Insights",'<div class="card"><h2>Portfolio Q&A</h2><p>Local calculations answer supported questions directly from your account records. No AI key is needed and nothing is sent to Gemini.</p><div class="formgrid"><label>Scope<select id="ai-scope"><option value="current">Selected owner view</option><option value="all">All owners including managed</option></select></label><label>Question<input id="ai-question" placeholder="What is my estimated dividend income?"></label></div><div class="actions"><button class="btn" id="ai-answer">Answer locally</button><button class="btn secondary" data-ai-q="portfolio">Portfolio overview</button><button class="btn secondary" data-ai-q="dividends">Dividends</button><button class="btn secondary" data-ai-q="energy">Energy / shipping baskets</button><button class="btn secondary" data-ai-q="pnl">Unrealized P&L</button></div><div id="ai-local" class="note">Choose a question or enter your own.</div></div><div class="card"><h2>Gemini Analysis · Review Before Sharing</h2><p>Prepare a grounded prompt using exact figures calculated by the app. Copy to Gemini and review the response. Gemini should explain—not independently invent—account figures.</p><label><input type="checkbox" id="ai-detail" style="width:auto"> Include individual positions, quantities, cost basis and account labels in the prompt</label><div class="actions"><button class="btn" id="ai-prepare">Prepare prompt</button><button class="btn secondary" id="ai-copy">Copy prompt</button></div><label>Review the data you will share<textarea id="ai-prompt" rows="10" readonly></textarea></label><p class="muted">No portfolio data is transmitted automatically. Copy/pasting is explicit; avoid sharing family details you do not want sent to another service.</p><a href="https://aistudio.google.com/" target="_blank" rel="noopener noreferrer">Open Google AI Studio</a></div><div class="card"><h2>Future in-app Gemini calls</h2><p>Secure Gemini requests will use Azure Functions and Entra authentication. No Gemini secret belongs in this public HTML app.</p></div>');
 const status=s=>el("fh-status").textContent=s;
 async function clipboard(t){try{await navigator.clipboard.writeText(t);toast("Copied to clipboard")}catch(e){alert("Clipboard permission unavailable; use HTTPS.")}}
@@ -30,28 +30,76 @@ diagnosticButton.onclick=async()=>{
  finally{diagnosticButton.disabled=false}
 };
 
-el("fh-refresh").onclick=async()=>{
- if(busy)return;let key=el("fh-key").value.trim(),ss=symbols().slice(0,Number(el("fh-max").value));
- if(!key)return alert("Enter a free Finnhub API token for this session.");
- if(!ss.length)return alert("No eligible USD stock / ETF tickers in the selected owner view.");
- busy=true;quotes=[];el("fh-refresh").disabled=true;el("fh-apply").disabled=true;
- for(let i=0;i<ss.length;i++){
-  let symbol=ss[i];status("Fetching "+(i+1)+" / "+ss.length+": "+symbol);
-  try{
-   const c=new AbortController(),timer=setTimeout(()=>c.abort(),12000);let response;
-   try{response=await fetch("https://api.finnhub.io/api/v1/quote?symbol="+encodeURIComponent(symbol)+"&token="+encodeURIComponent(key),{method:"GET",cache:"no-store",signal:c.signal})}finally{clearTimeout(timer)}
-   if(!response.ok)throw Error("HTTP "+response.status);
-   let j=await response.json(),price=Number(j.c),ts=Number(j.t);
-   if(!(price>0)||!(ts>0))throw Error("No quote or unsupported ticker");
-   quotes.push({symbol,price,asof:new Date(ts*1000).toISOString(),source:"Finnhub",ok:true,ageHours:(Date.now()-ts*1000)/3600000});
-  }catch(e){let message=String(e.message||e);if(message==="Failed to fetch"||e instanceof TypeError)message="Browser/network blocked request (CORS, extension, or connection)";else if(message==="HTTP 401"||message==="HTTP 403")message="Key invalid or not entitled (HTTP "+message.slice(-3)+")";else if(message==="HTTP 429")message="Finnhub free-tier rate limit (429)";quotes.push({symbol,ok:false,error:message})}
-  if(i<ss.length-1)await new Promise(r=>setTimeout(r,1100));
- }
- busy=false;el("fh-refresh").disabled=false;
- let good=quotes.filter(q=>q.ok).length;status(good+" of "+ss.length+" tickers returned usable quotes. Review data timestamps and coverage.");
+const requestGapMs=1500;
+const delay=ms=>new Promise(resolve=>setTimeout(resolve,ms));
+const textStatus=(completed,total,good,failed,detail)=>status(completed+" of "+total+" tickers checked · "+good+" prices · "+failed+" unavailable"+(detail?" · "+detail:""));
+el("fh-stop").onclick=()=>{stopRequested=true;status("Stop requested. Completing the active request, then displaying retrieved quotes.")};
+function showQuotePreview(){
+ let good=quotes.filter(q=>q.ok).length,bad=quotes.length-good;
  el("fh-table").className="tablewrap";
  el("fh-table").innerHTML='<table><thead><tr><th>Use</th><th>Symbol</th><th>Price USD</th><th>Quote timestamp</th><th>Status</th></tr></thead><tbody>'+quotes.map(q=>'<tr><td>'+(q.ok?'<input style="width:auto" type="checkbox" data-sym="'+E(q.symbol)+'" checked>':'—')+'</td><td>'+E(q.symbol)+'</td><td>'+(q.ok?M(q.price):'—')+'</td><td>'+E(q.asof||'—')+'</td><td>'+E(q.error||(q.ageHours>24?"Possibly stale — inspect":"Review"))+'</td></tr>').join("")+'</tbody></table>';
  el("fh-apply").disabled=!good;
+ textStatus(quotes.length,refreshTargetCount,good,bad,stopRequested?"Stopped early; available results shown":"Review retrieved prices before applying");
+}
+let refreshTargetCount=0;
+el("fh-refresh").onclick=async()=>{
+ if(busy)return;
+ const key=el("fh-key").value.trim(),max=el("fh-max").value;
+ const ss=max==="all"?symbols():symbols().slice(0,Number(max));
+ if(!key)return alert("Enter your Finnhub token first.");
+ if(!ss.length)return alert("No eligible USD stock / ETF tickers in the selected owner view.");
+ busy=true;stopRequested=false;refreshTargetCount=ss.length;quotes=[];
+ el("fh-refresh").disabled=true;el("fh-stop").disabled=false;el("fh-apply").disabled=true;
+ try{
+  for(let i=0;i<ss.length;i++){
+   if(stopRequested)break;
+   let symbol=ss[i],complete=false;
+   for(let attempt=0;attempt<2&&!complete;attempt++){
+    if(stopRequested)break;
+    const elapsed=Date.now()-lastStart;
+    if(lastStart&&elapsed<requestGapMs){textStatus(i,ss.length,quotes.filter(q=>q.ok).length,quotes.filter(q=>!q.ok).length,"Waiting for request spacing");await delay(requestGapMs-elapsed)}
+    if(stopRequested)break;
+    lastStart=Date.now();
+    textStatus(i,ss.length,quotes.filter(q=>q.ok).length,quotes.filter(q=>!q.ok).length,"Requesting "+symbol);
+    try{
+     const controller=new AbortController(),timer=setTimeout(()=>controller.abort(),12000);
+     let response;
+     try{
+      response=await fetch("https://api.finnhub.io/api/v1/quote?symbol="+encodeURIComponent(symbol)+"&token="+encodeURIComponent(key),{method:"GET",cache:"no-store",signal:controller.signal});
+     }finally{clearTimeout(timer)}
+     if(response.status===429){
+      if(attempt===0){
+       const retryAfter=response.headers.get("Retry-After");
+       const parsed=retryAfter&&/^\d+$/.test(retryAfter)?Number(retryAfter)*1000:65000;
+       const wait=Math.max(65000,Math.min(parsed,180000));
+       status("Finnhub rate limit (429). Pausing "+Math.ceil(wait/1000)+" seconds; will retry "+symbol+" once. You may stop.");
+       // Stop button remains available during this cooldown.
+       const until=Date.now()+wait;
+       while(Date.now()<until&&!stopRequested)await delay(Math.min(1000,until-Date.now()));
+       continue;
+      }
+      quotes.push({symbol,ok:false,error:"Rate-limited twice (HTTP 429); remaining symbols skipped"});
+      stopRequested=true;complete=true;break;
+     }
+     if(response.status===401||response.status===403){
+      quotes.push({symbol,ok:false,error:"API authorization denied (HTTP "+response.status+"); stopped"});
+      stopRequested=true;complete=true;break;
+     }
+     if(!response.ok)throw Error("HTTP "+response.status);
+     const j=await response.json(),price=Number(j.c),ts=Number(j.t);
+     if(!(price>0)||!(ts>0))throw Error("No valid quote / symbol not covered");
+     quotes.push({symbol,price,asof:new Date(ts*1000).toISOString(),source:"Finnhub",ok:true,ageHours:(Date.now()-ts*1000)/3600000});
+     complete=true;
+    }catch(e){
+     const message=e?.name==="AbortError"?"Request timed out":(e instanceof TypeError?"Browser/network request blocked":String(e.message||e));
+     quotes.push({symbol,ok:false,error:message});complete=true;
+    }
+   }
+   textStatus(quotes.length,ss.length,quotes.filter(q=>q.ok).length,quotes.filter(q=>!q.ok).length,"Last processed: "+symbol);
+  }
+ }finally{
+  busy=false;el("fh-refresh").disabled=false;el("fh-stop").disabled=true;showQuotePreview();
+ }
 };
 el("fh-apply").onclick=async()=>{
  const selected=quotes.filter(q=>q.ok&&[...document.querySelectorAll("#fh-table [data-sym]")].some(e=>e.dataset.sym===q.symbol&&e.checked));
