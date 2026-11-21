@@ -80,19 +80,15 @@ Go to **Import & Backup → Research Quote Intake**.
 Quote intake currently accepts USD and valid ISO 8601 timestamps with timezones. AI-generated market data is **unverified** and may be inaccurate or stale; do not treat it as a real-time feed. This does not automatically call Gemini or require an API key. Free-tier quote API providers can be integrated later via Azure Functions.
 
 
-## Market index references: TradingView Market Overview widget
+## Direct US index levels from FMP
 
-The Dashboard uses TradingView's documented `embed-widget-market-overview.js` widget with the following **index-linked CFD references**:
+The Dashboard now displays **actual Dow Jones Industrial Average, S&P 500 and Nasdaq Composite index levels** fetched from the individual Financial Modeling Prep `/stable/quote` endpoint using `^DJI`, `^GSPC` and `^IXIC`. A user confirmed successful results for all three symbols on November 20, 2026 with a free FMP key. The separate `/stable/batch-index-quotes` endpoint previously returned HTTP 402 and is no longer used.
 
-- `FOREXCOM:DJI` — tracks the Dow Jones Industrial Average.
-- `FOREXCOM:SPXUSD` — tracks the S&P 500.
-- `FOREXCOM:NSXUSD` — tracks the **Nasdaq-100, not Nasdaq Composite**.
+The provider's **individual quote timestamps are shown per index**. These timestamps may vary; even a 4 PM-adjacent or after-hours response is not guaranteed to equal a finalized, exchange-official closing print. The Dashboard displays the provider's latest price/change/percent change—not an estimate from SPY/DIA/QQQ or a CFD.
 
-These are **not official exchange-published index levels**. They are CFD/index-equivalent quotes. Their values can differ slightly from official index levels, and their timestamps and delays depend on the widget provider. The Dashboard explicitly labels this distinction. The widget's prices are display-only, hosted by TradingView, require no Finnhub/FMP API calls and are excluded from portfolio valuations.
+Open **Actual Indexes** to test on demand, configure the optional visible-only six-minute refresh during regular US trading hours, or stop polling. Three individual calls are required per refresh; the app limits itself to 210 requests per local ET date in browser session storage, but other devices and API usage consume FMP's allowance too. No automatic requests run while the page is hidden or after it closes.
 
-We previously tested the widget with direct `DJ:DJI`, `SP:SPX`, `NASDAQ:IXIC` and alternate `TVC:` index symbols, which rendered blank with warning icons in the user's browser. That can arise from symbol/data entitlements on embedded widgets. The documented CFD sources are the next supported approach. If they also fail, use [TradingView's official US index page](https://www.tradingview.com/markets/indices/quotes-us/) instead of silently substituting equity ETFs.
-
-**Macroaxis was not embedded:** its published free widget license says it does **not** work on HTTPS websites, while GitHub Pages is served over HTTPS. It would require an appropriate paid license. Its [Global Index Ticker widget terms](https://www.macroaxis.com/invest/widgets/native/indexTicker?g=All) disclose this restriction.
+Previous TradingView CFD-index widgets were removed from the Dashboard because their index-linked values differed from the desired actual index quotes. This does not affect Finnhub stock quotes, watchlists, or independent gold/silver/WTI market feeds.
 
 ## Focus watchlists and visible-only market updates
 
