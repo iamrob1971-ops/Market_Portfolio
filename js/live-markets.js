@@ -37,26 +37,74 @@ function openStream(){if(document.hidden)return;if(sock)return;let key=$("fh-key
 $("fw-start").onclick=openStream;$("fw-stop").onclick=()=>closeStream(true);
 document.addEventListener("visibilitychange",()=>{if(document.hidden)closeStream(false);else if(!manualStop)openStream()});
 $("fw-apply").onclick=async()=>{const selected=focusSymbols().filter(s=>live.has(s));if(!selected.length)return alert("No streamed trades received.");if(!confirm("Apply latest trades for "+selected.length+" symbols to matching holdings?"))return;let updated=0;for(let s of selected){let q=live.get(s);for(let h of state.holdings.filter(h=>h.symbol.toUpperCase()===s&&h.kind!=="money")){h.price=q.price;h.marketValue=null;h.quoteSource=q.source;h.quoteAsOf=q.asof;updated++}}await save();toast(updated+" positions repriced")};
-addPage("real-indexes","Actual Indexes",'<div class="card"><h2>Actual Dow, S&P 500 and Nasdaq Composite</h2><p>Experimental FMP batch-index-quotes provider; index points, not ETF proxies. Free-key eligibility, CORS and freshness need testing.</p><div class="formgrid"><label>FMP key (session only)<input id="fmp-key" type="password" autocomplete="off"></label><label>Auto interval<select id="fmp-interval"><option value="120000">2 minutes</option><option value="180000">3 minutes</option><option value="300000">5 minutes</option></select></label></div><div class="actions"><button class="btn" id="fmp-start">Enable visible-only auto updates</button><button class="btn secondary" id="fmp-test">Test once</button><button class="btn secondary" id="fmp-stop">Stop</button></div><p id="fmp-status" class="muted">No index provider connected.</p><div id="fmp-results"></div><small>Auto: weekdays 9:30 a.m.–4 p.m. ET, only while this page is visible. A single batch call every 2–5 minutes. A conservative 200-per-day browser budget; 250/day is the provider-wide free limit. This is not a guaranteed licensed real-time exchange feed.</small></div>');
+addPage("real-indexes","Actual Indexes",'<div class="card"><h2>Actual Dow, S&P 500 and Nasdaq Composite</h2><p>Tests the FMP individual quote endpoint for ^DJI, ^GSPC and ^IXIC, not the paid batch endpoint. Index points, not ETFs. Verify free-plan entitlement and freshness.</p><div class="formgrid"><label>FMP key (session only)<input id="fmp-key" type="password" autocomplete="off"></label><label>Auto interval<select id="fmp-interval"><option value="360000" selected>6 minutes (recommended)</option><option value="480000">8 minutes</option><option value="600000">10 minutes</option></select></label></div><div class="actions"><button class="btn" id="fmp-start">Enable visible-only auto updates</button><button class="btn secondary" id="fmp-test">Test once</button><button class="btn secondary" id="fmp-stop">Stop</button></div><p id="fmp-status" class="muted">No index provider connected.</p><div id="fmp-results"></div><small>Auto: weekdays 9:30 a.m.–4 p.m. ET, only while this page is visible. Three individual requests per refresh. About 195–198 calls for a six-minute trading-day cadence. Conservative 210-call browser budget; other device and account usage also counts. This is not a guaranteed licensed real-time exchange feed.</small></div>');
 let timer=null,enabled=false,lastQuery=0,pending=false,used=0;
 const indexes=[["^DJI","Dow Jones Industrial Average"],["^GSPC","S&P 500"],["^IXIC","Nasdaq Composite"]];
 function marketOpen(){const parts=Object.fromEntries(new Intl.DateTimeFormat("en-US",{timeZone:"America/New_York",weekday:"short",hour:"2-digit",minute:"2-digit",hour12:false}).formatToParts(new Date()).filter(x=>x.type!=="literal").map(x=>[x.type,x.value]));let t=Number(parts.hour)*60+Number(parts.minute);return !["Sat","Sun"].includes(parts.weekday)&&t>=570&&t<=960}
-function budget(){const date=new Intl.DateTimeFormat("en-CA",{timeZone:"America/New_York",year:"numeric",month:"2-digit",day:"2-digit"}).format(new Date());const key="portfolio-index-calls-"+date;let count=used;try{count=Number(sessionStorage.getItem(key))||0}catch(e){}return {key,count}}
-function consume(){let b=budget();used=b.count+1;try{sessionStorage.setItem(b.key,String(used))}catch(e){}}
+function budget(){
+ const parts=new Intl.DateTimeFormat("en-US",{timeZone:"America/New_York",year:"numeric",month:"2-digit",day:"2-digit"}).formatToParts(new Date());
+ const d=Object.fromEntries(parts.filter(x=>x.type!=="literal").map(x=>[x.type,x.value]));
+ const key="portfolio-index-individual-"+d.year+"-"+d.month+"-"+d.day;
+ let count=used;try{count=Number(sessionStorage.getItem(key))||0}catch(e){}
+ return {key,count};
+}
+function consume(){const b=budget();used=b.count+1;try{sessionStorage.setItem(b.key,String(used))}catch(e){}}
 const fmtChange=n=>Number.isFinite(n)?(n>0?"+":"")+num(n):"—";
 function renderIndexes(){let data=state.indexQuotes||{},rows=indexes.map(([symbol,name])=>{let v=data[symbol],p=Number(v?.price),c=v?.change===null?NaN:Number(v?.change),pct=Number.isFinite(c)&&p-c!==0?100*c/(p-c):NaN;return '<tr><td>'+safe(name)+'</td><td>'+(p>0?num(p):"—")+'</td><td>'+fmtChange(c)+'</td><td>'+(Number.isFinite(pct)?pct.toFixed(2)+"%":"—")+'</td><td>'+safe(v?.asof?new Date(v.asof).toLocaleString():v?.fetchedAt?"Fetched "+new Date(v.fetchedAt).toLocaleString()+" (quote time not supplied)":"—")+'</td></tr>'}).join("");const html='<table><thead><tr><th>Index</th><th>Points</th><th>Change</th><th>% Chg</th><th>As of</th></tr></thead><tbody>'+rows+'</tbody></table>';$("fmp-results").innerHTML=html;$("fmp-dashboard").innerHTML=html}
 const panel=document.createElement("div");panel.className="card";panel.innerHTML='<div class="row"><h2>Actual Index Levels</h2><button class="btn secondary" id="fmp-settings">Configure</button></div><p class="muted">Dow, S&P 500, Nasdaq Composite · actual index points (FMP), not ETF share prices. A source must be configured.</p><div id="fmp-dashboard"></div>';
 const marketCard=$("marketOverview")?.closest(".card");if(marketCard)marketCard.insertAdjacentElement("beforebegin",panel);panel.style.display="none"; // Legacy FMP test remains in Actual Indexes tab; TradingView is the main dashboard index view.
 $("fmp-settings").onclick=()=>document.querySelector('nav button[data-tab="real-indexes"]').click();
-async function fetchIndexes(force){if(pending||document.hidden||(!force&&!marketOpen()))return;let key=$("fmp-key").value.trim();if(!key){enabled=false;return $("fmp-status").textContent="Enter FMP key."}if(!force&&Date.now()-lastQuery<Number($("fmp-interval").value))return;if(budget().count>=200){enabled=false;return $("fmp-status").textContent="200-request browser budget reached; stopped."}pending=true;lastQuery=Date.now();consume();$("fmp-status").textContent="Querying index batch ("+budget().count+" calls in this browser today)...";
- try{const ctrl=new AbortController(),t=setTimeout(()=>ctrl.abort(),14000);let r;try{r=await fetch("https://financialmodelingprep.com/stable/batch-index-quotes?apikey="+encodeURIComponent(key),{cache:"no-store",signal:ctrl.signal})}finally{clearTimeout(t)}
- if(!r.ok){if(r.status>=400&&r.status<500)enabled=false;throw Error("FMP HTTP "+r.status+" — check key, endpoint entitlement and allowance")}
- const data=await r.json();if(!Array.isArray(data))throw Error("Index response not an array (possibly unsupported free entitlement)");
- let hits=0;state.indexQuotes=state.indexQuotes||{};for(let [symbol] of indexes){const q=data.find(x=>String(x.symbol).toUpperCase()===symbol);if(!(Number(q?.price)>0))continue;let timestamp=Number(q.timestamp);state.indexQuotes[symbol]={price:Number(q.price),change:q.change==null?null:Number(q.change),asof:timestamp>0?new Date(timestamp*1000).toISOString():null,fetchedAt:new Date().toISOString()};hits++}
- if(hits){await save();renderIndexes();$("fmp-status").textContent=hits+" of 3 actual indexes updated; "+budget().count+" requests used today."}else{enabled=false;$("fmp-status").textContent="No matching index data returned; auto disabled. Check free endpoint permissions."}
- }catch(e){enabled=false;$("fmp-status").textContent="Index unavailable: "+e.message+"; saved data retained. Auto paused until you test again."}finally{pending=false}}
+async function fetchIndexes(force){
+ if(pending||document.hidden||(!force&&!marketOpen()))return;
+ const key=$("fmp-key").value.trim();
+ if(!key){enabled=false;return $("fmp-status").textContent="Enter FMP key for individual index quotes."}
+ const interval=Number($("fmp-interval").value);
+ if(Date.now()-lastQuery<20000)return $("fmp-status").textContent="Please wait before testing again.";
+ if(!force&&Date.now()-lastQuery<interval)return;
+ if(budget().count+3>210){enabled=false;return $("fmp-status").textContent="Conservative 210-call daily browser budget reached; auto stopped."}
+ pending=true;lastQuery=Date.now();
+ let hits=0,errors=[],updates={};
+ try{
+  for(const [symbol,label] of indexes){
+   if(budget().count>=210){errors.push("Daily browser request allowance reached.");break}
+   consume();
+   $("fmp-status").textContent="Testing "+label+" via /stable/quote ("+budget().count+" calls today)...";
+   try{
+    const ctrl=new AbortController(),timer=setTimeout(()=>ctrl.abort(),12000);
+    let response;
+    try{response=await fetch("https://financialmodelingprep.com/stable/quote?symbol="+encodeURIComponent(symbol)+"&apikey="+encodeURIComponent(key),{cache:"no-store",signal:ctrl.signal})}
+    finally{clearTimeout(timer)}
+    if(!response.ok){
+     errors.push(label+": HTTP "+response.status+(response.status===402?" — plan does not include this endpoint":""));
+     if([401,402,403,429].includes(response.status)){enabled=false;break}
+     continue;
+    }
+    const body=await response.json();
+    const q=Array.isArray(body)?body.find(row=>String(row.symbol||"").toUpperCase()===symbol):null;
+    if(!(Number(q?.price)>0)){errors.push(label+": no usable index quote returned");continue}
+    let asof=null;
+    if(q.timestamp!==null&&q.timestamp!==undefined&&Number(q.timestamp)>0){
+      const ts=Number(q.timestamp);asof=new Date(ts>1e11?ts:ts*1000).toISOString()
+    }
+    let change=q.change===null||q.change===undefined?null:Number(q.change);
+    if(!Number.isFinite(change))change=null;
+    updates[symbol]={price:Number(q.price),change,asof,fetchedAt:new Date().toISOString(),source:"FMP individual index quote"};hits++;
+   }catch(e){errors.push(label+": "+(e?.name==="AbortError"?"timeout":String(e.message||e)))}
+   if(symbol!==indexes[indexes.length-1][0])await new Promise(resolve=>setTimeout(resolve,350));
+  }
+  if(hits){
+   state.indexQuotes={...(state.indexQuotes||{}),...updates};
+   await save();renderIndexes();
+   $("fmp-status").textContent=hits+" of 3 index quotes updated; "+budget().count+" browser calls today."+(errors.length?" Issues: "+errors.join("; "):"");
+  }else{
+   enabled=false;
+   $("fmp-status").textContent="No valid actual index quotes. "+errors.join("; ")+" Auto stopped; previously saved data untouched.";
+  }
+  if(errors.length)enabled=false;
+ }finally{pending=false}
+}
 function startTimer(){if(timer)clearInterval(timer);timer=setInterval(()=>{if(enabled&&!document.hidden)void fetchIndexes(false)},15000)}
-$("fmp-start").onclick=()=>{if(!$("fmp-key").value.trim())return alert("Enter FMP key.");enabled=true;startTimer();if(marketOpen())void fetchIndexes(true);else $("fmp-status").textContent="Enabled; waiting for regular US market hours and a visible page."};
+$("fmp-start").onclick=()=>{if(!$("fmp-key").value.trim())return alert("Enter FMP key.");enabled=true;startTimer();if(marketOpen())void fetchIndexes(true);else $("fmp-status").textContent="Auto enabled for regular market hours. Use Test once to check individual index access now."};
 $("fmp-test").onclick=()=>void fetchIndexes(true);
 $("fmp-stop").onclick=()=>{enabled=false;if(timer)clearInterval(timer);timer=null;$("fmp-status").textContent="Automatic refresh stopped."};
 document.addEventListener("visibilitychange",()=>{if(!document.hidden&&enabled)void fetchIndexes(false)});
