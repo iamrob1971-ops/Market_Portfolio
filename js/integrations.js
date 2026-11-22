@@ -20,14 +20,18 @@ function headerPanel(){
   {id:"XAG",title:"Silver spot",unit:"USD / troy oz"},
   {id:"WTI",title:"WTI crude reference",unit:"USD / barrel"}
  ];
- const spotTiles=spotDefs.map(def=>{
+ const spotRows=spotDefs.map(def=>{
   const q=spot[def.id],valid=q&&Number(q.price)>0&&Number.isFinite(Date.parse(q.asof));
   const observation=valid?new Date(q.asof).toLocaleString():"Not retrieved yet";
-  const change=valid&&Number.isFinite(Number(q.change))&&q.change!==null?'<small class="'+(q.change>=0?"positive":"negative")+'">'+(q.change>=0?"+":"")+M(q.change)+(Number.isFinite(Number(q.changePct))&&q.changePct!==null?" ("+Number(q.changePct).toFixed(2)+"%)":"")+'</small>':'<small class="muted">No verified daily comparison</small>';
-  return '<div class="market"><small>'+E(def.title)+'</small><strong>'+(valid?M(q.price):"—")+'</strong><small>'+E(def.unit)+'</small>'+change+'<small>'+E(valid?q.description:"Source pending")+'</small><small>'+E(observation)+'</small></div>';
+  const hasChange=valid&&q.change!==null&&q.change!==undefined&&Number.isFinite(Number(q.change));
+  const hasPct=valid&&q.changePct!==null&&q.changePct!==undefined&&Number.isFinite(Number(q.changePct));
+  const change=hasChange?'<span class="'+(Number(q.change)>=0?"positive":"negative")+'">'+(Number(q.change)>=0?"+":"")+M(q.change)+'</span>':"—";
+  const pct=hasPct?'<span class="'+(Number(q.changePct)>=0?"positive":"negative")+'">'+(Number(q.changePct)>=0?"+":"")+Number(q.changePct).toFixed(2)+'%</span>':"—";
+  return '<tr><td>'+E(def.title)+'<small style="display:block">'+E(def.unit)+' · '+E(valid?q.description:"Source pending")+'</small></td><td>'+ (valid?M(q.price):"—") +'</td><td>'+change+'</td><td>'+pct+'</td><td>'+E(observation)+'</td></tr>';
  }).join("");
  const target=el("marketOverview");if(!target)return;
- target.insertAdjacentHTML("afterbegin",spotTiles+cards);
+ const commodityTable='<div class="tablewrap"><table><thead><tr><th>Commodity</th><th>Price</th><th>Change</th><th>% Chg</th><th>As of</th></tr></thead><tbody>'+spotRows+'</tbody></table></div>';
+ target.insertAdjacentHTML("afterbegin",commodityTable+(cards?'<div class="markets">'+cards+'</div>':""));
  const form=el("marketHeaderOptions");if(form)form.innerHTML=headerChoices.map(c=>'<label style="display:flex;gap:8px;align-items:center"><input style="width:auto" type="checkbox" data-header-symbol="'+E(c.symbol)+'" '+(choices.includes(c.symbol)?"checked":"")+'><span>'+E(c.label)+' <small>('+E(c.sub)+')</small></span></label>').join("");
  const counts=el("refreshCounts");if(counts){let p=portfolioSymbols(),h=selectedHeaderSymbols(),duplicates=h.filter(x=>p.includes(x)).length;counts.textContent=p.length+" unique holdings tickers + "+h.length+" market indicator symbols − "+duplicates+" shared = "+symbols().length+" requests for the next full refresh."}
 }
