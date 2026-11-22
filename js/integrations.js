@@ -268,3 +268,21 @@ el("gateway-ask").onclick=async()=>{
 const original=render;render=function(){original();coverage();headerPanel()};
 coverage();headerPanel();
 })();
+(function(){
+"use strict";
+// Opens an authenticated SAME-ORIGIN Azure-hosted preview. No SnapTrade credentials
+// or brokerage positions are embedded in public GitHub Pages JavaScript.
+const nav=document.querySelector("nav"),main=document.querySelector("main");
+if(!nav||!main)return;
+const tab=document.createElement("button");
+tab.textContent="Fidelity Connected";
+tab.dataset.tab="fidelity-connected";
+const section=document.createElement("section");
+section.id="fidelity-connected";section.className="tab";
+section.innerHTML='<div class="card"><h2>Fidelity · Connected Preview</h2><p>Inspect current SnapTrade Commercial Test holdings, reported net equity, cash and money-market positions in the secured Azure viewer. This preview does not replace or save local portfolio records.</p><p class="note">The Azure viewer requires Microsoft Entra sign-in and an explicitly authorized account. Brokerage data may be cached by SnapTrade; each provider timestamp is shown when available.</p><div class="actions"><a class="btn" style="text-decoration:none;display:inline-block" target="_blank" rel="noopener noreferrer" href="https://market-portfolio-gateway-dafrbba7grdjgbhn.westus3-01.azurewebsites.net/api/brokerage/fidelity">Open secure Fidelity preview</a></div></div>';
+nav.append(tab);main.append(section);
+tab.addEventListener("click",()=>{
+  document.querySelectorAll(".tab").forEach(s=>s.classList.toggle("show",s===section));
+  document.querySelectorAll("nav button").forEach(b=>b.classList.toggle("active",b===tab));
+});
+})();
