@@ -111,6 +111,12 @@ function buildReplacement(converted){
  const oldHoldings=state.holdings.filter(h=>oldIds.has(h.accountId));
  const oldHoldingIds=new Set(oldHoldings.map(h=>h.id));
  const oldByProvider=new Map(state.accounts.filter(a=>isFidelity(a)&&isConnected(a)).map(a=>[a.id,a]));
+ for(const incoming of converted){
+  const previous=oldByProvider.get(incoming.id);
+  const previousCount=previous?state.holdings.filter(h=>h.accountId===previous.id).length:0;
+  if(previousCount>0&&incoming.positions.length===0&&incoming.connected.reportedEquity!==0)
+   throw Error("Previously funded account "+incoming.name+" returned no positions. Refusing incomplete refresh.");
+ }
  const owner=state.owners.find(o=>o.id==="me")||state.owners.find(o=>o.primary);
  if(!owner)throw Error("No primary owner group found.");
  const accountsToAdd=converted.map(x=>{
