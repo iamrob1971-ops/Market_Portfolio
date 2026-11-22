@@ -65,13 +65,13 @@ async function preview() {
   const userSecret = process.env.SNAPTRADE_USER_SECRET;
   const list = await api.accountInformation.listAllUserAccounts({ userId, userSecret });
   const all = Array.isArray(list.data?.results) ? list.data.results : [];
-  // Fidelity-only filter: fail visibly rather than accidentally show another brokerage's accounts.
-  const fidelity = all.filter(a => a.kind === "investment" &&
-    /fidelity/i.test([a.institution_name, a.institution?.name, a.brokerage_name, a.brokerage?.name, a.connection?.institution?.name].filter(Boolean).join(" ")));
+  // /accounts/all does not supply an institution name; show all investment accounts
+  // for this one-user Fidelity test connection. Verify identities before wider brokerage use.
+  const fidelity = all.filter(a => a.kind === "investment");
   const accounts = await Promise.all(fidelity.map(async a => {
     const result = {
-      id: clean(a.id), name: clean(a.name), accountType: clean(a.type),
-      institution: clean(a.institution_name || a.institution?.name || a.brokerage_name),
+      id: clean(a.id), name: clean(a.display_name || a.name), accountType: clean(a.raw_type || a.type),
+      institutionId: clean(a.institution_id), maskedAccountNumber: clean(a.masked_account_number),
       reportedNetValue: a.net_value || null, balances: null, positions: [], positionsAsOf: null, errors: []
     };
     const [balances, positions] = await Promise.allSettled([
@@ -90,7 +90,7 @@ async function preview() {
     source: "SnapTrade Commercial Test / Fidelity",
     retrievedAt: new Date().toISOString(),
     providerDataMayBeCached: true,
-    allAccountCount: all.length, fidelityInvestmentAccountCount: fidelity.length,
+    allAccountCount: all.length, investmentAccountCount: fidelity.length,
     note: "Broker-reported net equity is authoritative; do not add cash twice to cash-equivalent holdings. Null margin loan is unknown, not proof of a loan.",
     accounts
   });
@@ -108,7 +108,7 @@ app.http("fidelityPreview", {
     }
   }
 });
-const page = String.raw`<!doctype html><html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Fidelity · Connected Preview</title><style>body{font:15px system-ui;background:#f4f7fb;color:#16283e;margin:0}main{max-width:1200px;margin:auto;padding:22px}h1{font-size:25px}button{background:#2457bb;color:white;border:0;border-radius:8px;padding:11px 17px;cursor:pointer}button:disabled{opacity:.6}section{background:white;border:1px solid #dce4ef;border-radius:12px;padding:18px;margin:14px 0}.muted{color:#62758b}.scroll{overflow:auto}table{border-collapse:collapse;width:100%;white-space:nowrap}th,td{border-bottom:1px solid #e8eef5;text-align:left;padding:9px}td.num{text-align:right}th{font-size:12px;color:#64748b}strong{font-weight:700}</style><main><h1>Fidelity · Connected Preview</h1><p class="muted">Read-only SnapTrade Commercial Test data. Nothing is imported into the dashboard or saved in IndexedDB. Brokerage data may be cached.</p><button id="load">Retrieve Fidelity preview</button> <span id="message" role="status"></span><div id="results"></div></main><script>
+const page = String.raw`<!doctype html><html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Fidelity · Connected Preview</title><style>body{font:15px system-ui;background:#f4f7fb;color:#16283e;margin:0}main{max-width:1200px;margin:auto;padding:22px}h1{font-size:25px}button{background:#2457bb;color:white;border:0;border-radius:8px;padding:11px 17px;cursor:pointer}button:disabled{opacity:.6}section{background:white;border:1px solid #dce4ef;border-radius:12px;padding:18px;margin:14px 0}.muted{color:#62758b}.scroll{overflow:auto}table{border-collapse:collapse;width:100%;white-space:nowrap}th,td{border-bottom:1px solid #e8eef5;text-align:left;padding:9px}td.num{text-align:right}th{font-size:12px;color:#64748b}strong{font-weight:700}</style><main><h1>Fidelity · Connected Preview</h1><p class="muted">Read-only SnapTrade Commercial Test data. Nothing is imported into the dashboard or saved in IndexedDB. Account listing may be cached. Verify these accounts belong to Fidelity before trusting the preview.</p><button id="load">Retrieve Fidelity preview</button> <span id="message" role="status"></span><div id="results"></div></main><script>
 "use strict";
 const root=document.getElementById("results"),msg=document.getElementById("message"),btn=document.getElementById("load");
 const fmt=(v,c)=>v===null||v===undefined||v===""?"—":c&&Number.isFinite(Number(v))?new Intl.NumberFormat(undefined,{style:"currency",currency:c}).format(Number(v)):String(v);
@@ -120,8 +120,8 @@ btn.onclick=async()=>{
     const res=await fetch("/api/brokerage/fidelity/preview",{method:"POST",credentials:"same-origin",headers:{"Accept":"application/json"}});
     const d=await res.json();
     if(!res.ok)throw Error(d.error||"HTTP "+res.status);
-    msg.textContent="Retrieved "+new Date(d.retrievedAt).toLocaleString()+" · "+d.fidelityInvestmentAccountCount+" Fidelity investment accounts";
-    if(!d.accounts.length){node("section","No Fidelity investment accounts matched institution metadata. "+d.allAccountCount+" connected accounts were returned; no data was modified.",root);return}
+    msg.textContent="Retrieved "+new Date(d.retrievedAt).toLocaleString()+" · "+d.investmentAccountCount+" connected investment accounts";
+    if(!d.accounts.length){node("section","No investment accounts were returned. "+d.allAccountCount+" connected accounts were returned; no data was modified.",root);return}
     for(const a of d.accounts){
       const s=node("section","",root);node("h2",a.name||"Investment account",s);
       node("p","Provider account ID: "+(a.id||"—")+" · Type: "+(a.accountType||"—"),s,"muted");
