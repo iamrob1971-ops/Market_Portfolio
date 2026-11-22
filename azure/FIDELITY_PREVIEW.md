@@ -13,7 +13,7 @@ Status: source committed, Azure deployment pending.
 ## Routes
 
 - `GET /api/brokerage/fidelity` — authenticated Azure-hosted viewer (same-origin).
-- `POST /api/brokerage/fidelity/preview` — authenticated JSON preview.
+- `GET /api/brokerage/fidelity/preview` — authenticated JSON preview.
 - A new `Fidelity Connected` tab in GitHub Pages links to the viewer; the browser does not send SnapTrade credentials.
 
 ## Setup after checkout
