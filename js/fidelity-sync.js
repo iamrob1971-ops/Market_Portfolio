@@ -165,6 +165,7 @@ async function receiveSnapshot(payload){
   try{state=built.next;await save()}
   catch(e){state=old;render();throw e}
   showStatus("Fidelity sync complete: "+converted.length+" connected accounts, "+built.positions+" positions. Replaced "+built.removed+" old Fidelity accounts.");
+  paste.value=""; // Do not retain a second copy of the private snapshot in the input field.
   nonce=null;
   renderConnected();
  }catch(e){showStatus("Fidelity not replaced: "+String(e.message||e));}
