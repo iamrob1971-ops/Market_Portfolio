@@ -83,3 +83,6 @@ app.http("ask", {
     } catch (e) { return guard(e, context); }
   }
 });
+
+// Register the private read-only Fidelity routes without changing existing handlers.
+require("./brokerage");
