@@ -7,7 +7,9 @@ const MESSAGE_TYPE="market-portfolio:fidelity-v1";
 const button=document.getElementById("fidelity-sync-open");
 const message=document.getElementById("fidelity-sync-status");
 const details=document.getElementById("fidelity-sync-details");
-if(!button||!message||!details)return;
+const paste=document.getElementById("fidelity-sync-paste");
+const pasteButton=document.getElementById("fidelity-sync-paste-apply");
+if(!button||!message||!details||!paste||!pasteButton)return;
 let popup=null,nonce=null,working=false;
 const validNumber=v=>v!==null&&v!==undefined&&v!==""&&Number.isFinite(Number(v));
 const number=v=>Number(v);
@@ -145,11 +147,11 @@ function buildReplacement(converted){
  // Keep non-Fidelity manual data, owner groups, baskets, watchlists and historical snapshots.
  return {next,removed:obsolete.length,positions:newHoldings.length};
 }
-window.addEventListener("message",async event=>{
- if(event.origin!==AZURE_ORIGIN||event.source!==popup||!nonce||event.data?.type!==MESSAGE_TYPE||event.data?.nonce!==nonce||working)return;
- working=true;button.disabled=true;
+async function receiveSnapshot(payload){
+ if(working)return;
+ working=true;button.disabled=true;pasteButton.disabled=true;
  try{
-  const converted=prepare(event.data.payload);
+  const converted=prepare(payload);
   const previous=state.accounts.filter(isFidelity);
   const sum=converted.reduce((n,a)=>n+a.connected.reportedEquity,0);
   const rows=converted.map(a=>a.name+" - "+fmtMoney(a.connected.reportedEquity)+" ("+a.positions.length+" positions)").join("\n");
@@ -166,7 +168,19 @@ window.addEventListener("message",async event=>{
   nonce=null;
   renderConnected();
  }catch(e){showStatus("Fidelity not replaced: "+String(e.message||e));}
- finally{working=false;button.disabled=false}
+ finally{working=false;button.disabled=false;pasteButton.disabled=false}
+}
+
+window.addEventListener("message",event=>{
+ if(event.origin!==AZURE_ORIGIN||event.source!==popup||!nonce||event.data?.type!==MESSAGE_TYPE||event.data?.nonce!==nonce)return;
+ void receiveSnapshot(event.data.payload);
+});
+pasteButton.addEventListener("click",()=>{
+ let data;
+ try{data=JSON.parse(paste.value);}
+ catch(_){showStatus("Paste the complete Fidelity snapshot JSON copied from the secure Azure viewer.");return}
+ if(!data||data.transferFormat!=="market-portfolio-fidelity-snapshot-v1"||!data.payload){showStatus("Unrecognized Fidelity snapshot. Use Copy for dashboard in the secure viewer.");return}
+ void receiveSnapshot(data.payload);
 });
 const previousRender=render;
 render=function(){previousRender();renderConnected()};
