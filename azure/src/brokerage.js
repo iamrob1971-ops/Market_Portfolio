@@ -108,32 +108,32 @@ app.http("fidelityPreview", {
     }
   }
 });
-const page = String.raw`<!doctype html><html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Fidelity · Connected Preview</title><style>body{font:15px system-ui;background:#f4f7fb;color:#16283e;margin:0}main{max-width:1200px;margin:auto;padding:22px}h1{font-size:25px}button{background:#2457bb;color:white;border:0;border-radius:8px;padding:11px 17px;cursor:pointer}button:disabled{opacity:.6}section{background:white;border:1px solid #dce4ef;border-radius:12px;padding:18px;margin:14px 0}.muted{color:#62758b}.scroll{overflow:auto}table{border-collapse:collapse;width:100%;white-space:nowrap}th,td{border-bottom:1px solid #e8eef5;text-align:left;padding:9px}td.num{text-align:right}th{font-size:12px;color:#64748b}strong{font-weight:700}</style><main><h1>Fidelity · Connected Preview</h1><p class="muted">Read-only SnapTrade Commercial Test data. Nothing is imported into the dashboard or saved in IndexedDB. Account listing may be cached. Verify these accounts belong to Fidelity before trusting the preview.</p><button id="load">Retrieve Fidelity preview</button> <span id="message" role="status"></span><div id="results"></div></main><script>
+const page = String.raw`<!doctype html><html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Fidelity  -  Connected Preview</title><style>body{font:15px system-ui;background:#f4f7fb;color:#16283e;margin:0}main{max-width:1200px;margin:auto;padding:22px}h1{font-size:25px}button{background:#2457bb;color:white;border:0;border-radius:8px;padding:11px 17px;cursor:pointer}button:disabled{opacity:.6}section{background:white;border:1px solid #dce4ef;border-radius:12px;padding:18px;margin:14px 0}.muted{color:#62758b}.scroll{overflow:auto}table{border-collapse:collapse;width:100%;white-space:nowrap}th,td{border-bottom:1px solid #e8eef5;text-align:left;padding:9px}td.num{text-align:right}th{font-size:12px;color:#64748b}strong{font-weight:700}</style><main><h1>Fidelity  -  Connected Preview</h1><p class="muted">Read-only SnapTrade Commercial Test data. Nothing is imported into the dashboard or saved in IndexedDB. Account listing may be cached. Verify these accounts belong to Fidelity before trusting the preview.</p><button id="load">Retrieve Fidelity preview</button> <span id="message" role="status"></span><div id="results"></div></main><script>
 "use strict";
 const root=document.getElementById("results"),msg=document.getElementById("message"),btn=document.getElementById("load");
-const fmt=(v,c)=>v===null||v===undefined||v===""?"—":c&&Number.isFinite(Number(v))?new Intl.NumberFormat(undefined,{style:"currency",currency:c}).format(Number(v)):String(v);
+const fmt=(v,c)=>v===null||v===undefined||v===""?"--":c&&Number.isFinite(Number(v))?new Intl.NumberFormat(undefined,{style:"currency",currency:c}).format(Number(v)):String(v);
 const node=(tag,txt,parent,cls)=>{const e=document.createElement(tag);e.textContent=txt??"";if(cls)e.className=cls;parent.append(e);return e};
 function table(parent,heads,rows){const wrap=node("div","",parent,"scroll"),t=node("table","",wrap),tr=node("tr","",t);heads.forEach(x=>node("th",x,tr));rows.forEach(r=>{const tr=node("tr","",t);r.forEach((v,i)=>node("td",v,tr,i>0?"num":""))})}
 btn.onclick=async()=>{
-  btn.disabled=true;msg.textContent="Requesting brokerage data…";root.replaceChildren();
+  btn.disabled=true;msg.textContent="Requesting brokerage data...";root.replaceChildren();
   try{
     const res=await fetch("/api/brokerage/fidelity/preview",{method:"GET",credentials:"same-origin",headers:{"Accept":"application/json"}});
     const d=await res.json();
     if(!res.ok)throw Error(d.error||"HTTP "+res.status);
-    msg.textContent="Retrieved "+new Date(d.retrievedAt).toLocaleString()+" · "+d.investmentAccountCount+" connected investment accounts";
+    msg.textContent="Retrieved "+new Date(d.retrievedAt).toLocaleString()+"  -  "+d.investmentAccountCount+" connected investment accounts";
     if(!d.accounts.length){node("section","No investment accounts were returned. "+d.allAccountCount+" connected accounts were returned; no data was modified.",root);return}
     for(const a of d.accounts){
       const s=node("section","",root);node("h2",a.name||"Investment account",s);
-      node("p","Provider account ID: "+(a.id||"—")+" · Type: "+(a.accountType||"—"),s,"muted");
+      node("p","Provider account ID: "+(a.id||"--")+"  -  Type: "+(a.accountType||"--"),s,"muted");
       const b=a.balances;node("p","Net equity: "+(b?.netValue?fmt(b.netValue.amount,b.netValue.currency):"Unavailable")+
-       " · Margin classification: "+(b?.cashOrMargin||"Unknown")+" · Balance as of: "+(b?.asOf||"Unknown"),s);
+       "  -  Margin classification: "+(b?.cashOrMargin||"Unknown")+"  -  Balance as of: "+(b?.asOf||"Unknown"),s);
       if(b?.cash?.length)table(s,["Reported cash currency","Amount"],b.cash.map(x=>[x.currency,fmt(x.amount,x.currency)]));
       if(b?.marginLoanBalances?.length)table(s,["Reported margin loan currency","Amount"],b.marginLoanBalances.map(x=>[x.currency,fmt(x.amount,x.currency)]));
       else node("p","Margin loan detail: "+(b?.marginLoanBalances===null?"Not reported":"No reported loan entries"),s,"muted");
       node("h3","Positions ("+a.positions.length+")",s);
       table(s,["Symbol","Type","Units","Price","Average basis/unit","Currency","Counted in cash"],a.positions.map(p=>[
-        (p.symbol||"—")+" · "+(p.description||""),p.kind||"—",fmt(p.units),fmt(p.price,p.currency),fmt(p.costBasisPerUnit,p.currency),
-        p.currency||"—",p.cashEquivalent?"Yes":"No"
+        (p.symbol||"--")+"  -  "+(p.description||""),p.kind||"--",fmt(p.units),fmt(p.price,p.currency),fmt(p.costBasisPerUnit,p.currency),
+        p.currency||"--",p.cashEquivalent?"Yes":"No"
       ]));
       node("p","Positions as of: "+(a.positionsAsOf||"Unknown"),s,"muted");
       a.errors.forEach(x=>node("p","Unavailable: "+x,s,"muted"));
