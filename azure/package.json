@@ -1,1 +1,18 @@
-{"name":"market-portfolio-gateway","version":"0.1.0","private":true,"description":"Read-only market quote and grounded Gemini analysis Azure Functions gateway","main":"src/functions.js","scripts":{"start":"func start","check":"node --check src/functions.js"},"engines":{"node":">=20"},"dependencies":{"@azure/functions":"^4.7.0"}}
+{
+  "name": "market-portfolio-gateway",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Read-only market quote and grounded Gemini analysis Azure Functions gateway",
+  "main": "src/functions.js",
+  "scripts": {
+    "start": "func start",
+    "check": "node --check src/functions.js && node --check src/brokerage.js"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "dependencies": {
+    "@azure/functions": "^4.7.0",
+    "snaptrade-typescript-sdk": "13.4.8"
+  }
+}
