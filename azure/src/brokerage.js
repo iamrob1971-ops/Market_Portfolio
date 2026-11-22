@@ -119,7 +119,7 @@ function summary(a){
  const b=a.balances,cur=b?.netValue?.currency||a.reportedNetValue?.currency||"USD";
  const equity=numeric(b?.netValue?.amount??a.reportedNetValue?.amount);
  let holdings=0,cashEquivalent=0,complete=true,priced=0;
- for(const p of a.positions){const units=numeric(p.units),price=numeric(p.price);if(units===null||price===null){complete=false;continue}const v=units*price;holdings+=v;priced++;if(p.cashEquivalent)cashEquivalent+=v}
+ for(const p of a.positions){const units=numeric(p.units),price=numeric(p.price);if(units===null||price===null||(p.currency&&p.currency!==cur)){complete=false;continue}const v=units*price;holdings+=v;priced++;if(p.cashEquivalent)cashEquivalent+=v}
  const cash=(b?.cash||[]).filter(x=>x.currency===cur).reduce((n,x)=>n+(numeric(x.amount)||0),0);
  const hasCash=Array.isArray(b?.cash)&&b.cash.some(x=>x.currency===cur);
  return {cur,equity,holdings:complete?holdings:null,cashEquivalent:complete?cashEquivalent:null,cash:hasCash?cash:null,priced,total:a.positions.length,complete:complete&&!a.errors.length};
