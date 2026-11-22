@@ -112,27 +112,50 @@ const page = String.raw`<!doctype html><html lang="en"><meta charset="utf-8"><me
 "use strict";
 const root=document.getElementById("results"),msg=document.getElementById("message"),btn=document.getElementById("load");
 const fmt=(v,c)=>v===null||v===undefined||v===""?"--":c&&Number.isFinite(Number(v))?new Intl.NumberFormat(undefined,{style:"currency",currency:c}).format(Number(v)):String(v);
+const safeText=v=>String(v??"").replace(/Â·|·/g," - ");
+const numeric=v=>v!==null&&v!==undefined&&v!==""&&Number.isFinite(Number(v))?Number(v):null;
+const money=(v,c)=>v===null?"Unavailable":fmt(v,c||"USD");
+function summary(a){
+ const b=a.balances,cur=b?.netValue?.currency||a.reportedNetValue?.currency||"USD";
+ const equity=numeric(b?.netValue?.amount??a.reportedNetValue?.amount);
+ let holdings=0,cashEquivalent=0,complete=true,priced=0;
+ for(const p of a.positions){const units=numeric(p.units),price=numeric(p.price);if(units===null||price===null){complete=false;continue}const v=units*price;holdings+=v;priced++;if(p.cashEquivalent)cashEquivalent+=v}
+ const cash=(b?.cash||[]).filter(x=>x.currency===cur).reduce((n,x)=>n+(numeric(x.amount)||0),0);
+ const hasCash=Array.isArray(b?.cash)&&b.cash.some(x=>x.currency===cur);
+ return {cur,equity,holdings:complete?holdings:null,cashEquivalent:complete?cashEquivalent:null,cash:hasCash?cash:null,priced,total:a.positions.length,complete:complete&&!a.errors.length};
+}
 const node=(tag,txt,parent,cls)=>{const e=document.createElement(tag);e.textContent=txt??"";if(cls)e.className=cls;parent.append(e);return e};
 function table(parent,heads,rows){const wrap=node("div","",parent,"scroll"),t=node("table","",wrap),tr=node("tr","",t);heads.forEach(x=>node("th",x,tr));rows.forEach(r=>{const tr=node("tr","",t);r.forEach((v,i)=>node("td",v,tr,i>0?"num":""))})}
 btn.onclick=async()=>{
   btn.disabled=true;msg.textContent="Requesting brokerage data...";root.replaceChildren();
   try{
     const res=await fetch("/api/brokerage/fidelity/preview",{method:"GET",credentials:"same-origin",headers:{"Accept":"application/json"}});
+    const type=res.headers.get("content-type")||"";
+    if(!type.includes("application/json"))throw Error("Azure returned HTTP "+res.status+" without JSON. Check Microsoft sign-in, then reload.");
     const d=await res.json();
     if(!res.ok)throw Error(d.error||"HTTP "+res.status);
     msg.textContent="Retrieved "+new Date(d.retrievedAt).toLocaleString()+"  -  "+d.investmentAccountCount+" connected investment accounts";
     if(!d.accounts.length){node("section","No investment accounts were returned. "+d.allAccountCount+" connected accounts were returned; no data was modified.",root);return}
     for(const a of d.accounts){
       const s=node("section","",root);node("h2",a.name||"Investment account",s);
-      node("p","Provider account ID: "+(a.id||"--")+"  -  Type: "+(a.accountType||"--"),s,"muted");
-      const b=a.balances;node("p","Net equity: "+(b?.netValue?fmt(b.netValue.amount,b.netValue.currency):"Unavailable")+
-       "  -  Margin classification: "+(b?.cashOrMargin||"Unknown")+"  -  Balance as of: "+(b?.asOf||"Unknown"),s);
+      node("p","Type: "+(a.accountType||"--")+"  -  Account: "+(a.maskedAccountNumber||"Masked number unavailable")+"  -  Institution ID: "+(a.institutionId||"Unavailable"),s,"muted");
+      const b=a.balances,su=summary(a);
+      table(s,["Account reconciliation","Amount"],[
+        ["Broker-reported net equity",money(su.equity,su.cur)],
+        ["Priced positions (includes money-market funds)",money(su.holdings,su.cur)],
+        ["Of which: flagged cash equivalents",money(su.cashEquivalent,su.cur)],
+        ["Separately reported cash (may overlap with funds)",money(su.cash,su.cur)],
+        ["Positions with usable units and prices",su.priced+" of "+su.total],
+        ["Data status",su.complete?"Retrieved; accounting overlap unverified":"Incomplete; do not sync"]
+      ]);
+      node("p","Do not add cash equivalents to positions a second time. Broker net equity is the reference figure; position and cash totals are not yet a proven reconciliation formula.",s,"muted");
+      node("p","Margin classification: "+(b?.cashOrMargin||"Unknown")+"  -  Balance as of: "+(b?.asOf||"Unknown"),s,"muted");
       if(b?.cash?.length)table(s,["Reported cash currency","Amount"],b.cash.map(x=>[x.currency,fmt(x.amount,x.currency)]));
       if(b?.marginLoanBalances?.length)table(s,["Reported margin loan currency","Amount"],b.marginLoanBalances.map(x=>[x.currency,fmt(x.amount,x.currency)]));
       else node("p","Margin loan detail: "+(b?.marginLoanBalances===null?"Not reported":"No reported loan entries"),s,"muted");
       node("h3","Positions ("+a.positions.length+")",s);
       table(s,["Symbol","Type","Units","Price","Average basis/unit","Currency","Counted in cash"],a.positions.map(p=>[
-        (p.symbol||"--")+"  -  "+(p.description||""),p.kind||"--",fmt(p.units),fmt(p.price,p.currency),fmt(p.costBasisPerUnit,p.currency),
+        (safeText(p.symbol)||"--")+" - "+safeText(p.description),p.kind||"--",fmt(p.units),fmt(p.price,p.currency),fmt(p.costBasisPerUnit,p.currency),
         p.currency||"--",p.cashEquivalent?"Yes":"No"
       ]));
       node("p","Positions as of: "+(a.positionsAsOf||"Unknown"),s,"muted");
