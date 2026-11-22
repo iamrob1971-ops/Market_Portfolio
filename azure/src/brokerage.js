@@ -96,7 +96,7 @@ async function preview() {
   });
 }
 app.http("fidelityPreview", {
-  methods: ["POST"], authLevel: "anonymous", route: "brokerage/fidelity/preview",
+  methods: ["GET"], authLevel: "anonymous", route: "brokerage/fidelity/preview",
   handler: async (req, ctx) => {
     const denied = authorize(req);
     if (denied) return reply(denied.status, { error: denied.error });
@@ -117,7 +117,7 @@ function table(parent,heads,rows){const wrap=node("div","",parent,"scroll"),t=no
 btn.onclick=async()=>{
   btn.disabled=true;msg.textContent="Requesting brokerage data…";root.replaceChildren();
   try{
-    const res=await fetch("/api/brokerage/fidelity/preview",{method:"POST",credentials:"same-origin",headers:{"Accept":"application/json"}});
+    const res=await fetch("/api/brokerage/fidelity/preview",{method:"GET",credentials:"same-origin",headers:{"Accept":"application/json"}});
     const d=await res.json();
     if(!res.ok)throw Error(d.error||"HTTP "+res.status);
     msg.textContent="Retrieved "+new Date(d.retrievedAt).toLocaleString()+" · "+d.investmentAccountCount+" connected investment accounts";
