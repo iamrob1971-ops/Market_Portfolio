@@ -4,7 +4,7 @@ const $=id=>document.getElementById(id),safe=v=>esc(String(v??"")),num=v=>Number
 const stocks=()=>[...new Set(holdings().filter(h=>h.kind!=="money").map(h=>h.symbol.toUpperCase()))].sort();
 function init(){if(!Array.isArray(state.focusGroups))state.focusGroups=[{id:"focus",name:"Focus",symbols:[]}]}
 function addPage(id,name,html){const button=document.createElement("button");button.dataset.tab=id;button.textContent=name;document.querySelector("nav").append(button);const panel=document.createElement("section");panel.id=id;panel.className="tab";panel.innerHTML=html;document.querySelector("main").append(panel);button.onclick=()=>{document.querySelectorAll(".tab").forEach(t=>t.classList.toggle("show",t===panel));document.querySelectorAll("nav button").forEach(t=>t.classList.toggle("active",t===button))};return panel}
-addPage("live-focus","Watchlists & Live",'<div class="card"><h2>Focus Watchlists</h2><p>Select stocks you own, or follow other symbols. Group locally; no brokerage trades occur.</p><div class="formgrid"><label>Group<select id="fw-group"></select></label><label>New group<input id="fw-group-name" placeholder="Tech watch"></label><label>Symbol<input id="fw-symbol" placeholder="NVDA"></label><label>From my holdings<select id="fw-holdings"></select></label></div><div class="actions"><button class="btn secondary" id="fw-create">Create group</button><button class="btn secondary" id="fw-add">Add symbol</button><button class="btn secondary" id="fw-add-held">Add holding</button><button class="btn secondary" id="fw-del-group">Delete group</button></div><div id="fw-list"></div></div><div class="card"><h2>Finnhub Live Trade Stream</h2><p>One browser WebSocket for up to 20 selected symbols. Trades can be sparse, come from a limited exchange feed, and need not match a consolidated brokerage quote.</p><div class="actions"><button class="btn" id="fw-start">Start live updates</button><button class="btn secondary" id="fw-stop">Stop</button><button class="btn secondary" id="fw-apply">Apply streamed prices to holdings</button></div><p id="fw-status" class="muted" role="status">Disconnected. Enter Finnhub token in Price Refresh.</p><div id="fw-table"></div><small>Connection closes when this browser tab is hidden and resumes when visible unless stopped. No stream changes your saved holdings without applying.</small></div>');
+addPage("live-focus","Watchlists & Live",'<div class="card"><h2>Focus Watchlists</h2><p>Select stocks you own, or follow other symbols. Group locally; no brokerage trades occur.</p><div class="formgrid"><label>Group<select id="fw-group"></select></label><label>New group<input id="fw-group-name" placeholder="Tech watch"></label><label>Symbol<input id="fw-symbol" placeholder="NVDA"></label><label>From my holdings<select id="fw-holdings"></select></label></div><div class="actions"><button class="btn secondary" id="fw-create">Create group</button><button class="btn secondary" id="fw-add">Add symbol</button><button class="btn secondary" id="fw-add-held">Add holding</button><button class="btn secondary" id="fw-del-group">Delete group</button></div><div id="fw-list"></div></div><div class="card"><h2>Finnhub Live Trade Stream</h2><p>One browser WebSocket for up to 20 selected symbols. Trades can be sparse, come from a limited exchange feed, and need not match a consolidated brokerage quote.</p><div class="actions"><button class="btn" id="fw-start">Start live updates</button><button class="btn secondary" id="fw-stop">Stop</button><button class="btn secondary" id="fw-close-refresh">Load prior closes</button><button class="btn secondary" id="fw-apply">Apply streamed prices to holdings</button></div><p id="fw-status" class="muted" role="status">Disconnected. Enter Finnhub token in Price Refresh.</p><div id="fw-table"></div><small>Change and % change compare the latest streamed trade (or saved price when no trade has arrived) with the Finnhub previous-close reference. Use Load prior closes to request separate REST quotes (up to 20, spaced to respect rate limits). A trade is not a consolidated closing quote. No reference = no calculated change.</small><small>Connection closes when this browser tab is hidden and resumes when visible unless stopped. No stream changes your saved holdings without applying.</small></div>');
 const focusSymbols=()=>[...new Set((state.focusGroups||[]).flatMap(g=>g.symbols||[]))];
 function group(){return state.focusGroups.find(g=>g.id===$("fw-group").value)}
 function renderGroups(){
@@ -20,16 +20,61 @@ $("fw-add").onclick=()=>addSymbol($("fw-symbol").value);
 $("fw-add-held").onclick=()=>addSymbol($("fw-holdings").value);
 $("fw-del-group").onclick=async()=>{let g=group();if(!g||!confirm("Delete watchlist group "+g.name+"? No holdings will be removed."))return;state.focusGroups=state.focusGroups.filter(x=>x!==g);if(!state.focusGroups.length)state.focusGroups=[{id:uid(),name:"Focus",symbols:[]}];await save();renderGroups();subscribeCurrent()};
 $("fw-list").onclick=async e=>{let b=e.target.closest("[data-rm]");if(!b)return;let g=group();g.symbols=g.symbols.filter(x=>x!==b.dataset.rm);await save();renderGroups();subscribeCurrent()};
-const live=new Map();let sock=null,manualStop=true,retry=null,retries=0,ticks=0;
+const live=new Map(),closeReferences=new Map();let sock=null,manualStop=true,retry=null,retries=0,ticks=0,loadingCloses=false;
 const streamStatus=s=>$("fw-status").textContent=s;
-function getPrice(s){const t=live.get(s);if(t)return t;let h=holdings().find(h=>h.symbol.toUpperCase()===s);return h?{price:Number(h.price),asof:h.quoteAsOf||null,source:h.quoteSource||"Saved",previousClose:h.previousClose}:null}
-function renderLive(){let items=focusSymbols().map(s=>{let q=getPrice(s);return '<tr><td>'+safe(s)+'</td><td>'+(q&&Number(q.price)>0?num(q.price):"—")+'</td><td>'+safe(q?.source||"Unavailable")+'</td><td>'+safe(q?.asof?new Date(q.asof).toLocaleString():"Unknown")+'</td></tr>'});$("fw-table").innerHTML='<table><thead><tr><th>Symbol</th><th>Last $</th><th>Source</th><th>Time</th></tr></thead><tbody>'+items.join("")+'</tbody></table>'}
+function getPrice(s){const t=live.get(s);if(t)return t;let h=holdings().find(h=>h.symbol.toUpperCase()===s);return h?{price:Number(h.price),asof:h.quoteAsOf||null,source:h.quoteSource||"Saved"}:null}
+const money2=n=>Number(n).toLocaleString("en-US",{minimumFractionDigits:2,maximumFractionDigits:2});
+function reference(s){return closeReferences.get(s)||null}
+function renderLive(){
+ const rows=focusSymbols().map(s=>{
+  const q=getPrice(s),ref=reference(s),last=q&&Number(q.price)>0?Number(q.price):null,prev=ref?.previousClose??null;
+  const delta=last!==null&&prev!==null&&prev>0?last-prev:null;
+  const ch=delta===null?"—":'<span class="'+(delta>=0?"positive":"negative")+'">'+(delta>=0?"+":"")+money2(delta)+'</span>';
+  const pc=delta===null?"—":'<span class="'+(delta>=0?"positive":"negative")+'">'+(delta>=0?"+":"")+(delta/prev*100).toFixed(2)+'%</span>';
+  return '<tr><td>'+safe(s)+'</td><td>'+(last===null?"—":num(last))+'</td><td>'+(prev===null?"—":num(prev))+'</td><td>'+ch+'</td><td>'+pc+'</td><td>'+safe(q?.source||"Unavailable")+'</td><td>'+safe(q?.asof?new Date(q.asof).toLocaleString():"Unknown")+'</td></tr>';
+ });
+ $("fw-table").innerHTML='<div class="tablewrap"><table><thead><tr><th>Symbol</th><th>Last $</th><th>Prior close $</th><th>Change $</th><th>Change %</th><th>Last source</th><th>Trade / price time</th></tr></thead><tbody>'+rows.join("")+'</tbody></table></div>';
+}
+async function loadPriorCloses(){
+ if(loadingCloses)return;
+ const key=$("fh-key")?.value.trim();
+ if(!key)return streamStatus("Enter your Finnhub API key under Price Refresh first.");
+ const symbolsToLoad=focusSymbols().filter(symok).slice(0,20);
+ if(!symbolsToLoad.length)return streamStatus("Add watchlist symbols first.");
+ loadingCloses=true;$("fw-close-refresh").disabled=true;
+ let good=0,failed=0;
+ try{
+  for(let i=0;i<symbolsToLoad.length;i++){
+   const symbol=symbolsToLoad[i];
+   streamStatus("Loading prior closes: "+(i+1)+" of "+symbolsToLoad.length+" ("+symbol+")");
+   try{
+    const controller=new AbortController(),timer=setTimeout(()=>controller.abort(),12000);
+    let response;
+    try{response=await fetch("https://api.finnhub.io/api/v1/quote?symbol="+encodeURIComponent(symbol)+"&token="+encodeURIComponent(key),{cache:"no-store",signal:controller.signal})}
+    finally{clearTimeout(timer)}
+    if([401,403,429].includes(response.status)){
+      streamStatus("Prior-close request stopped (HTTP "+response.status+"). Check Finnhub entitlement or request limit.");
+      break;
+    }
+    if(!response.ok)throw Error("HTTP "+response.status);
+    const q=await response.json(),pc=Number(q.pc);
+    if(!(pc>0))throw Error("No valid prior close");
+    closeReferences.set(symbol,{previousClose:pc,fetchedAt:new Date().toISOString(),source:"Finnhub REST /quote"});
+    good++;
+   }catch(e){failed++}
+   renderLive();
+   if(i<symbolsToLoad.length-1)await new Promise(resolve=>setTimeout(resolve,1500));
+  }
+  streamStatus("Prior-close references: "+good+" loaded, "+failed+" unavailable. Stream "+(sock&&sock.readyState===WebSocket.OPEN?"connected":"not connected")+".");
+ }finally{loadingCloses=false;$("fw-close-refresh").disabled=false}
+}
+$("fw-close-refresh").onclick=()=>void loadPriorCloses();
 function subscribeCurrent(){if(!sock||sock.readyState!==WebSocket.OPEN)return;let before=new Set(sock._symbols||[]),want=new Set(focusSymbols());for(let s of before)if(!want.has(s))sock.send(JSON.stringify({type:"unsubscribe",symbol:s}));for(let s of want)if(!before.has(s))sock.send(JSON.stringify({type:"subscribe",symbol:s}));sock._symbols=[...want];streamStatus("Connected; "+want.size+" symbols; "+ticks+" trade updates received.")}
 function closeStream(stop){manualStop=stop;if(retry){clearTimeout(retry);retry=null}if(sock){let old=sock;sock=null;old.onclose=null;old.close()}streamStatus(stop?"Stopped.":"Paused: page not visible.")}
 function openStream(){if(document.hidden)return;if(sock)return;let key=$("fh-key")?.value.trim();if(!key)return streamStatus("Enter Finnhub API key in Price Refresh first.");if(!focusSymbols().length)return streamStatus("Add symbols to a watchlist first.");manualStop=false;
  try{const ws=new WebSocket("wss://ws.finnhub.io?token="+encodeURIComponent(key));sock=ws;ws._symbols=[];streamStatus("Connecting...");
  ws.onopen=()=>{if(sock!==ws)return;retries=0;subscribeCurrent()};
- ws.onmessage=e=>{let m;try{m=JSON.parse(e.data)}catch{return}if(m.type!=="trade"||!Array.isArray(m.data))return;let allowed=new Set(focusSymbols()),changed=false;for(let p of m.data){let s=String(p.s||"").toUpperCase(),price=Number(p.p),time=Number(p.t);if(!allowed.has(s)||!(price>0)||!Number.isFinite(time))continue;const previousClose=getPrice(s)?.previousClose??null;live.set(s,{price,asof:new Date(time).toISOString(),source:"Finnhub streamed trade",previousClose});ticks++;changed=true}if(changed){renderLive();streamStatus("Live; "+ticks+" trade updates; last "+new Date().toLocaleTimeString())}};
+ ws.onmessage=e=>{let m;try{m=JSON.parse(e.data)}catch{return}if(m.type!=="trade"||!Array.isArray(m.data))return;let allowed=new Set(focusSymbols()),changed=false;for(let p of m.data){let s=String(p.s||"").toUpperCase(),price=Number(p.p),time=Number(p.t);if(!allowed.has(s)||!(price>0)||!Number.isFinite(time))continue;live.set(s,{price,asof:new Date(time).toISOString(),source:"Finnhub streamed trade"});ticks++;changed=true}if(changed){renderLive();streamStatus("Live; "+ticks+" trade updates; last "+new Date().toLocaleTimeString())}};
  ws.onerror=()=>{if(sock===ws)streamStatus("WebSocket connection / entitlement error.")};
  ws.onclose=e=>{if(sock!==ws)return;sock=null;if(!manualStop&&!document.hidden&&retries<5){let ms=Math.min(30000,1500*2**retries++);streamStatus("Disconnected ("+e.code+"); retrying in "+Math.round(ms/1000)+"s");retry=setTimeout(()=>{retry=null;openStream()},ms)}else streamStatus("Disconnected; use Start to retry.")};
  }catch(e){streamStatus("WebSocket unavailable: "+e.message)}
