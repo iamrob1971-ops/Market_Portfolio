@@ -102,7 +102,7 @@ async function fetchIndexes(force,onlySymbol){
  const key=$("fmp-key").value.trim();
  if(!key){enabled=false;return $("fmp-status").textContent="Enter FMP key for individual index quotes."}
  const interval=Number($("fmp-interval").value);
- if(Date.now()-lastQuery<20000)return $("fmp-status").textContent="Please wait before testing again.";
+ if(Date.now()-lastQuery<20000){$("fmp-status").textContent="Wait 20 seconds between index tests.";return {error:"Wait 20 seconds between FMP index refreshes."}}
  if(!force&&Date.now()-lastQuery<interval)return;
  const targets=onlySymbol?indexes.filter(([symbol])=>symbol===onlySymbol):indexes;
  if(!targets.length)return {error:"Unknown index symbol"};
