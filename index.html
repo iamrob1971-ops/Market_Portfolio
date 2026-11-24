@@ -41,7 +41,14 @@ header h1{font-size:22px;margin:0}header small{color:#b6c8da}main{max-width:1280
 </main><div id="toast" role="status"></div><footer>Market Portfolio v1 · Personal tracking only · Financial amounts are derived from your entries</footer>
 <style>
 .holdings-sort{border:0;background:transparent;color:inherit;font:inherit;font-weight:inherit;cursor:pointer;text-align:left;white-space:nowrap;padding:2px 4px;}
-#accountBreakdown .tablewrap{overflow:visible;max-width:100%}#accountBreakdown table{width:100%;table-layout:fixed;white-space:normal}#accountBreakdown th:first-child,#accountBreakdown td:first-child{width:70%;overflow-wrap:anywhere;word-break:normal;padding-right:12px}#accountBreakdown th:last-child,#accountBreakdown td:last-child{width:30%;text-align:right;white-space:nowrap}#accountBreakdown th,#accountBreakdown td{vertical-align:top}
+#accountBreakdown .tablewrap{overflow-x:auto;max-width:100%}
+#accountBreakdown table{width:100%;min-width:440px;table-layout:fixed;white-space:normal}
+#accountBreakdown th,#accountBreakdown td{vertical-align:top;padding:9px 6px}
+#accountBreakdown th:first-child,#accountBreakdown td:first-child{width:48%;overflow-wrap:break-word;word-break:normal;padding-right:12px}
+#accountBreakdown th:nth-child(2),#accountBreakdown td:nth-child(2){width:26%;text-align:right;white-space:nowrap;font-variant-numeric:tabular-nums}
+#accountBreakdown th:nth-child(3),#accountBreakdown td:nth-child(3){width:26%;text-align:right;white-space:nowrap;font-variant-numeric:tabular-nums}
+#accountBreakdown td:nth-child(n+2){font-size:13px}
+@media(max-width:600px){#accountBreakdown table{min-width:435px}}
 .holdings-sort:hover{text-decoration:underline;}
 .holdings-sort:focus-visible{outline:2px solid #2563eb;outline-offset:2px;border-radius:3px;}
 </style>
@@ -59,9 +66,9 @@ function sortedHoldings(rows){
  const get=(h)=>{switch(holdingsSort.key){
   case "ticker":return String(h.symbol||"").toUpperCase();
   case "shares":return Number(h.quantity);
-  case "dayPct":return Number(h.previousClose)>0?(Number(h.price)-Number(h.previousClose))/Number(h.previousClose)*100:null;
-  case "marketValue":return value(h);
-  case "pnl":return profit(h);
+  case "dayPct":{const p=Number(usableMarketQuote(h)?.previousClose??h.previousClose);return p>0?(effectivePrice(h)-p)/p*100:null}
+  case "marketValue":return estimatedValue(h);
+  case "pnl":return estimatedProfit(h);
   default:return null;
  }};
  return rows.map((h,i)=>({h,i})).sort((a,b)=>{
@@ -103,8 +110,14 @@ function usableMarketQuote(h){
  if(!q||!(Number(q.price)>0)||!Number.isFinite(Date.parse(q.asof)))return null;
  const age=Date.now()-Date.parse(q.asof);
  if(age< -300000||age>24*3600000)return null;
- const baseline=Date.parse(h.quoteAsOf||"");
- if(Number.isFinite(baseline)&&Date.parse(q.asof)<=baseline)return null;
+ // SnapTrade quoteAsOf can be a data-retrieval timestamp, not the
+ // underlying exchange observation. Comparing quote times against it
+ // incorrectly discards valid Finnhub prices.
+ // Only disallow quotes fetched before the latest connected account sync.
+ const account=state.accounts.find(a=>a.id===h.accountId);
+ const syncTime=Date.parse(account?.connected?.syncedAt||"");
+ const fetchedTime=Date.parse(q.fetchedAt||"");
+ if(account?.connected?.provider==="snaptrade"&&Number.isFinite(syncTime)&&Number.isFinite(fetchedTime)&&fetchedTime<syncTime)return null;
  return q;
 }
 function effectivePrice(h){return Number(usableMarketQuote(h)?.price??h.price)}
@@ -131,9 +144,9 @@ function render(){
  const dayBase=dayRows.reduce((sum,h)=>sum+Number(usableMarketQuote(h)?.previousClose??h.previousClose)*h.quantity,0);
  const dailySummary=dayRows.length?'<span class="'+(dayChange>=0?"positive":"negative")+'">'+money(dayChange)+' ('+pct(dayBase?dayChange/dayBase*100:0)+')</span>':'—';
  const estimate=marketEstimate(acc);
- $("metrics").innerHTML=[["Estimated Portfolio Value",money(estimate.estimated)+'<small style="display:block;font-size:12px;font-weight:400">Market adjustment '+money(estimate.movement)+' · covered '+pct(estimate.eligible?100*estimate.covered/estimate.eligible:0)+' of eligible value</small>'],["Broker / Recorded Value",money(t.total)],["Unrealized P&L",'<span class="'+(t.pnl>=0?"positive":"negative")+'">'+money(t.pnl)+'</span>'],["Daily Price Change · Covered Holdings",dailySummary],["Cash + Money Funds",money(t.cash+t.moneyFund)],["Pending Adjustment",money(t.pending)],["Est. Annual Dividends",money(t.income)]].map(x=>'<div class="card"><small>'+x[0]+'</small><div class="metric">'+x[1]+'</div></div>').join("");
+ $("metrics").innerHTML=[["Estimated Portfolio Value",money(estimate.estimated)+'<small style="display:block;font-size:12px;font-weight:400">Market adjustment '+money(estimate.movement)+' · covered '+pct(estimate.eligible?100*estimate.covered/estimate.eligible:0)+' of eligible value</small>'],["Last Reported / Recorded Value",money(t.total)],["Est. Unrealized P&L",'<span class="'+(hs.filter(h=>h.basis!=null).reduce((sum,h)=>sum+estimatedProfit(h),0)>=0?"positive":"negative")+'">'+money(hs.filter(h=>h.basis!=null).reduce((sum,h)=>sum+estimatedProfit(h),0))+'</span>'],["Daily Price Change · Covered Holdings",dailySummary],["Cash + Money Funds",money(t.cash+t.moneyFund)],["Pending Adjustment",money(t.pending)],["Est. Annual Dividends",money(t.income)]].map(x=>'<div class="card"><small>'+x[0]+'</small><div class="metric">'+x[1]+'</div></div>').join("");
  $("marketOverview").innerHTML=state.market.length?state.market.slice(0,12).map(x=>'<div class="market"><small>'+esc(x.symbol)+'</small><strong>'+num(x.value)+' '+esc(x.units)+'</strong><small class="'+(x.change>=0?"positive":"negative")+'">'+(x.change>=0?"+":"")+pct(x.change)+'</small><small>Manual · '+esc(x.updated.slice(0,10))+'</small></div>').join(""):"";
- $("accountBreakdown").innerHTML=table(["Account","Reported / Recorded","Estimated"],acc.map(a=>'<tr>'+td(esc(label(a)))+td(money(totals([a]).total),"num")+td(money(marketEstimate([a]).estimated),"num")+'</tr>'));
+ $("accountBreakdown").innerHTML=table(["Account","Last Reported","Estimated"],acc.map(a=>'<tr>'+td(esc(label(a)))+td(money(totals([a]).total),"num")+td(money(marketEstimate([a]).estimated),"num")+'</tr>'));
  const other=state.owners.filter(x=>!x.primary);$("managedSummary").innerHTML=other.map(x=>{let ta=totals(state.accounts.filter(a=>a.ownerId===x.id));return '<div class="row" style="border-bottom:1px solid #edf1f6;padding:9px"><span>'+esc(x.name)+'</span><strong>'+money(ta.total)+'</strong></div>'}).join("")||'<div class="empty">No managed owner groups.</div>';
  $("snapshots").innerHTML=table(["Date","View","Total","P&L"],state.snapshots.filter(x=>x.filter===filter).slice(-10).reverse().map(x=>'<tr>'+td(esc(x.date))+td(esc(x.filter))+td(money(x.total))+td(money(x.pnl))+'</tr>'));
  const connectedChecks=acc.filter(a=>a.connected?.provider==="snaptrade").map(a=>{
@@ -159,7 +172,7 @@ function render(){
  const q=usableMarketQuote(h),price=effectivePrice(h),prior=Number(q?.previousClose??h.previousClose),v=estimatedValue(h),p=estimatedProfit(h);
  const eligible=h.kind!=="money"&&(!h.currency||h.currency==="USD")&&/^[A-Z][A-Z0-9.-]{0,14}$/.test(String(h.symbol||"").toUpperCase());
  const action=eligible?'<button type="button" class="ticker-refresh" data-refresh-ticker="'+esc(h.symbol.toUpperCase())+'" title="Refresh only '+esc(h.symbol)+' from Finnhub" aria-label="Refresh quote for '+esc(h.symbol)+'">↻</button> ':'';
- const time=q?'<small style="display:block;color:#64748b">Finnhub · '+esc(new Date(q.asof).toLocaleString())+'</small>':'<small style="display:block;color:#64748b">'+esc(h.quoteSource||"Recorded")+'</small>';
+ const time=q?'<small style="display:block;color:#2563eb">Finnhub · '+esc(new Date(q.asof).toLocaleString())+'</small>'+(h.source==="snaptrade"?'<small style="display:block;color:#64748b">Broker price '+money(h.price)+'</small>':''):'<small style="display:block;color:#64748b">'+esc(h.quoteSource||"Recorded")+'</small>';
  return '<tr>'+td(esc(label(state.accounts.find(a=>a.id===h.accountId))))+td('<strong>'+esc(h.symbol)+'</strong> '+action+(h.kind==="money"?' <span class="pill">Money fund</span>':""))+td(num(h.quantity))+td(money(price)+time)+td(prior>0?money(prior):"—")+td(prior>0?'<span class="'+(price>=prior?"positive":"negative")+'">'+money(price-prior)+' ('+pct((price-prior)/prior*100)+')</span>':"—")+td(prior>0?'<span class="'+(price>=prior?"positive":"negative")+'">'+money((price-prior)*h.quantity)+'</span>':"—")+td(money(v)) +td(h.basis==null?"—":money(h.basis))+td(p==null?"—":'<span class="'+(p>=0?"positive":"negative")+'">'+money(p)+'</span>')+td(h.source==="snaptrade"?"Synced":b("deleteHolding",h.id,"Delete"))+'</tr>';
  }));
 
