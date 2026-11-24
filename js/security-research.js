@@ -26,7 +26,7 @@ async function api(endpoint,params={}){
  const controller=new AbortController(),timer=setTimeout(()=>controller.abort(),12000);
  try{
   const query=new URLSearchParams({...params,token:key()});
-  const response=await fetch("https://finnhub.io/api/v1/"+endpoint+"?"+query.toString(),{method:"GET",cache:"no-store",signal:controller.signal});
+  const response=await fetch("https://api.finnhub.io/api/v1/"+endpoint+"?"+query.toString(),{method:"GET",cache:"no-store",signal:controller.signal});
   if(!response.ok)throw Error("Finnhub HTTP "+response.status+(response.status===429?" — request limit reached":""));
   return await response.json();
  }finally{clearTimeout(timer)}
@@ -36,15 +36,16 @@ panel.addEventListener("submit",async e=>{
  if(busy)return;
  const q=document.getElementById("researchTerm").value.trim();
  if(!q)return;
- busy=true;status("Searching…");document.getElementById("researchResults").innerHTML="";document.getElementById("researchDetails").innerHTML="";
+ busy=true;let exactSymbol=null;status("Searching…");document.getElementById("researchResults").innerHTML="";document.getElementById("researchDetails").innerHTML="";
  try{
   const result=await api("search",{q}),items=Array.isArray(result.result)?result.result:[];
   const clean=items.filter(x=>/^[A-Z][A-Z0-9.-]{0,14}$/i.test(String(x.symbol||""))).slice(0,12);
   document.getElementById("researchResults").innerHTML=clean.map(item=>'<button type="button" class="research-result" data-research-symbol="'+E(item.symbol)+'"><strong>'+E(item.displaySymbol||item.symbol)+'</strong><small style="display:block">'+E(item.description||"")+'</small></button>').join("");
   status(clean.length?clean.length+" matching securities. Select one to load its details.":"No covered symbols found.");
-  if(clean.length===1&&String(clean[0].symbol).toUpperCase()===q.toUpperCase())void loadDetails(clean[0].symbol);
+  if(clean.length===1&&String(clean[0].symbol).toUpperCase()===q.toUpperCase())exactSymbol=clean[0].symbol;
  }catch(err){status("Search unavailable: "+String(err.message||err))}
  finally{busy=false}
+ if(exactSymbol)await loadDetails(exactSymbol);
 });
 const moneyVal=(v,unit="USD")=>v===null?"Unavailable":(unit==="USD"?"$":"")+v.toLocaleString("en-US",{maximumFractionDigits:2});
 const fmtNumber=v=>v===null?"Unavailable":v.toLocaleString("en-US",{maximumFractionDigits:2});
