@@ -1,3 +1,7 @@
+## Research workspace update (Nov 24, 2026)
+
+The local research sidebar now supports manual research notes with source references and observation dates, restores the active workspace safely after a JSON restore, and reopens the selected thread after collapse. Select Security and type a ticker to open a thread without needing a holding. Gemini API integration remains disabled; no keys or questions are transmitted. SharePoint schema is planned only; no lists or permissions have been changed.
+
 ## AI Research sidebar — Phase 1 (Nov 24, 2026)
 
 Use **✨ AI Research** in the header for portfolio or market questions, or **✨ AI** beside a holding ticker in the Dashboard or Holdings tab. The same ticker across accounts opens one default security thread. The sidebar supports editable templates, saved questions, recent/history navigation, rename, new session, fork and deletion.
