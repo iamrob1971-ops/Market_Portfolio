@@ -65,7 +65,7 @@ async function loadDetails(symbol){
   const metrics=await get("stock/metric",{symbol,metric:"all"});
   const today=new Date().toISOString().slice(0,10),future=new Date(Date.now()+90*86400000).toISOString().slice(0,10);
   const calendar=await get("calendar/dividend",{from:today,to:future,symbol});
-  const m=metrics?.metric||{},price=val(quote?.c),prior=val(quote?.pc),open=val(quote?.o),high=val(quote?.h),low=val(quote?.l);
+  const m=metrics?.metric||{},rawPrice=val(quote?.c),price=rawPrice>0?rawPrice:null,rawPrior=val(quote?.pc),prior=rawPrior>0?rawPrior:null,open=val(quote?.o),high=val(quote?.h),low=val(quote?.l);
   const hi52=val(m["52WeekHigh"]),lo52=val(m["52WeekLow"]);
   const dividend=val(m.dividendPerShareAnnual),yieldValue=val(m.dividendYieldIndicatedAnnual);
   const entries=Array.isArray(calendar?.dividendCalendar)?calendar.dividendCalendar:[];
