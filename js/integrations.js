@@ -235,9 +235,11 @@ el("fh-refresh").onclick=async()=>{
   busy=false;el("fh-refresh").disabled=false;el("fh-stop").disabled=true;
   // Apply full-refresh quotes to the independent estimate layer automatically.
   const accepted=quotes.filter(q=>q.ok&&storeMarketQuote(q.symbol,q)).length;
-  if(accepted){try{await save()}catch(err){status("Quotes returned but could not save: "+String(err.message||err))}}
+  let saved=false,saveError="";
+  if(accepted){try{await save();saved=true;document.dispatchEvent(new CustomEvent("market-quote-updated",{detail:{fullRefresh:true}}))}catch(err){saveError=String(err.message||err)}}
   showQuotePreview();
-  if(accepted)status(accepted+" market quotes saved automatically; Holdings and estimated totals updated. Broker snapshot unchanged.");
+  if(saved)status(accepted+" market quotes saved automatically; Holdings and estimated totals updated. Broker snapshot unchanged.");
+  else if(saveError)status("Quotes returned, but saving failed: "+saveError);
  }
 };
 el("fh-apply").onclick=async()=>{
