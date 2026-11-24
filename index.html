@@ -279,24 +279,76 @@ function checkpointRecord(type,monthKeyValue){
    syncedAt:a.connected?.syncedAt||null}))};
 }
 function renderMonthlyPrompt(){
- const banner=$("monthlyCheckpointBanner");if(!banner)return;
- const key=dueMonthlyCheckpoint(filter);
- if(!key){banner.classList.add("hidden");banner.innerHTML="";return}
- const month=new Date(Number(key.slice(0,4)),Number(key.slice(5))-1,1)
-  .toLocaleDateString("en-US",{month:"long",year:"numeric"});
- banner.classList.remove("hidden");
- banner.innerHTML='<span style="font-size:23px" aria-hidden="true">📅</span><div class="checkpoint-main"><strong>'+esc(month)+' checkpoint ready</strong><small>Manual only · reminder stays until saved · records values when clicked</small></div><button type="button" class="btn" id="monthlyCheckpointSave" data-month="'+esc(key)+'">Save checkpoint</button>';
+ const host=$("monthlyCheckpointBanner");if(!host)return;
+ const key=dueMonthlyCheckpoint(filter),date=new Date(),name=key?new Date(Number(key.slice(0,4)),Number(key.slice(5))-1,1).toLocaleDateString("en-US",{month:"long",year:"numeric"}):"";
+ const count=(state.snapshots||[]).filter(x=>x.filter===filter).length;
+ host.innerHTML='<button type="button" class="checkpoint-trigger'+(key?' is-due':'')+'" id="checkpointMenuToggle" aria-expanded="false" aria-controls="checkpointMenu">'+(key?'<span class="checkpoint-dot" aria-hidden="true"></span>':'')+'☷ Checkpoint'+(key?' due':'')+'</button>'+
+ '<div class="checkpoint-menu hidden" id="checkpointMenu"><strong>'+esc(key?name+" checkpoint ready":"Save portfolio checkpoint")+'</strong>'+
+ '<small>'+esc(key?"Due since the first of the month. It remains due until you record it.":"Save another observation whenever you want.")+' Values are captured only when you click.</small>'+
+ (key?'<button type="button" class="btn" id="monthlyCheckpointSave" data-month="'+esc(key)+'">Save '+esc(name)+' checkpoint</button>':'')+
+ '<button type="button" class="btn secondary" id="saveSnapshot">+ Save extra checkpoint</button>'+
+ '<button type="button" class="btn secondary" id="checkpointHistoryOpen">View checkpoint history ('+count+')</button></div>';
 }
+function renderDashboardMarketStrip(){
+ const host=$("dashboardMarketStrip");if(!host)return;
+ const indexes=state.indexQuotes||{},spots=state.spotSummary||{};
+ const input=[
+  {label:"S&P 500",data:indexes["^GSPC"],points:true},
+  {label:"Dow Jones",data:indexes["^DJI"],points:true},
+  {label:"Nasdaq",data:indexes["^IXIC"],points:true},
+  {label:"Gold",data:spots.XAU},
+  {label:"Silver",data:spots.XAG},
+  {label:"WTI Oil",data:spots.WTI}
+ ];
+ const dateText=d=>{const t=Date.parse(d||"");return Number.isFinite(t)?new Intl.DateTimeFormat("en-US",{month:"numeric",day:"numeric",hour:"numeric",minute:"2-digit"}).format(new Date(t)):"No timestamp"};
+ host.innerHTML=input.map(item=>{
+  const x=item.data,valid=x&&Number(x.price)>0;
+  const change=x?.change==null?null:Number(x.change),hasChange=Number.isFinite(change);
+  const pctValue=x?.changePct!=null?Number(x.changePct):hasChange&&valid&&Number(x.price)!==change?100*change/(Number(x.price)-change):null;
+  const hasPct=pctValue!==null&&Number.isFinite(pctValue);
+  const shown=valid?(item.points?num(x.price):money(x.price)):"—";
+  const changeHTML=hasPct?'<span class="'+(pctValue>=0?"positive":"negative")+'">'+(pctValue>=0?"+":"")+pct(pctValue)+'</span>':'<span class="muted">No daily change</span>';
+  return '<div class="dash-ticker" title="'+esc(x?.source||"Saved market observation")+'"><span class="dash-ticker-name">'+esc(item.label)+'</span><strong class="dash-ticker-value">'+shown+'</strong><span class="dash-ticker-move">'+changeHTML+'</span><span class="dash-ticker-time">'+esc(dateText(x?.asof||x?.fetchedAt))+'</span></div>';
+ }).join("");
+}
+let dashboardHoldingsExpanded=false;
+function renderDashboardHoldings(){
+ const host=$("dashboardHoldingsTable"),tableSource=$("holdingsTable"),counter=$("dashboardHoldingsCount"),more=$("dashboardHoldingsMore");
+ if(!host||!tableSource)return;
+ host.innerHTML=tableSource.innerHTML;
+ const query=($("dashboardHoldingsSearch")?.value||"").trim().toLowerCase();
+ const rows=[...host.querySelectorAll("tbody tr")],matches=rows.filter(r=>r.textContent.toLowerCase().includes(query));
+ const cap=dashboardHoldingsExpanded?Infinity:12;let shown=0;
+ rows.forEach(row=>{const keep=matches.includes(row)&&shown<cap;row.hidden=!keep;if(keep)shown++});
+ if(counter)counter.textContent=matches.length+" matching holdings"+(!dashboardHoldingsExpanded&&matches.length>12?" · showing first 12":"");
+ if(more){more.classList.toggle("hidden",matches.length<=12);more.textContent=dashboardHoldingsExpanded?"Show fewer":"Show all "+matches.length}
+}
+
 function render(){
  const o=$("ownerFilter");let current=filter;o.innerHTML='<option value="mine">My Portfolio</option><option value="all">All Portfolios (oversight)</option>'+state.owners.filter(x=>!x.primary).map(x=>'<option value="'+esc(x.id)+'">'+esc(x.name)+'</option>').join("");o.value=current;if(!o.value)filter="mine",o.value="mine";
  const acc=accounts(),hs=holdings(),t=totals();
  renderMonthlyPrompt();
+ renderDashboardMarketStrip();
+ $("dashboard").classList.toggle("dashboard-dark",state.dashboardTheme==="dark");
+ $("dashboardThemeLabel").textContent=state.dashboardTheme==="dark"?"Light mode":"Dark mode";
   const dayRows=hs.filter(h=>h.kind!=="money"&&Number(usableMarketQuote(h)?.previousClose??h.previousClose)>0&&Number(h.quantity)>0);
  const dayChange=dayRows.reduce((sum,h)=>sum+(effectivePrice(h)-Number(usableMarketQuote(h)?.previousClose??h.previousClose))*h.quantity,0);
  const dayBase=dayRows.reduce((sum,h)=>sum+Number(usableMarketQuote(h)?.previousClose??h.previousClose)*h.quantity,0);
  const dailySummary=dayRows.length?'<span class="'+(dayChange>=0?"positive":"negative")+'">'+money(dayChange)+' ('+pct(dayBase?dayChange/dayBase*100:0)+')</span>':'—';
  const estimate=marketEstimate(acc);
- $("metrics").innerHTML=[["Estimated Portfolio Value",money(estimate.estimated)+'<small style="display:block;font-size:12px;font-weight:400">Market adjustment '+money(estimate.movement)+' · covered '+pct(estimate.eligible?100*estimate.covered/estimate.eligible:0)+' of eligible value</small>'],["Last Reported / Recorded Value",money(t.total)],["Est. Unrealized P&L",'<span class="'+(hs.filter(h=>h.basis!=null).reduce((sum,h)=>sum+estimatedProfit(h),0)>=0?"positive":"negative")+'">'+money(hs.filter(h=>h.basis!=null).reduce((sum,h)=>sum+estimatedProfit(h),0))+'</span>'],["Daily Price Change · Covered Holdings",dailySummary],["Cash + Money Funds",money(t.cash+t.moneyFund)],["Pending Adjustment",money(t.pending)],["Est. Annual Dividends",money(t.income)]].map(x=>'<div class="card"><small>'+x[0]+'</small><div class="metric">'+x[1]+'</div></div>').join("");
+ const estimatedPnl=hs.filter(h=>h.basis!=null).reduce((sum,h)=>sum+estimatedProfit(h),0);
+ const estimateChange=estimate.estimated-t.total,coverage=estimate.eligible?100*estimate.covered/estimate.eligible:0;
+ $("dashboardHeadlineValue").textContent=money(estimate.estimated);
+ $("dashboardHeadlineMove").innerHTML='<span class="'+(estimateChange>=0?"positive":"negative")+'">'+(estimateChange>=0?"+":"")+money(estimateChange)+'</span> market adjustment <small style="font-weight:400;color:var(--dash-sub)"> · '+pct(coverage)+' quote coverage</small>';
+ const metricItems=[
+  ["Last Reported",money(t.total)],
+  ["Est. Unrealized P&L",'<span class="'+(estimatedPnl>=0?"positive":"negative")+'">'+money(estimatedPnl)+'</span>'],
+  ["Covered Daily Change",dailySummary],
+  ["Cash + Money Funds",money(t.cash+t.moneyFund)],
+  ["Annual Dividends",money(t.income)],
+  ["Pending Adjustment",money(t.pending)]
+ ];
+ $("metrics").innerHTML=metricItems.map(([name,value])=>'<div class="dashboard-kpi"><small>'+esc(name)+'</small><div class="metric">'+value+'</div></div>').join("");
  $("marketOverview").innerHTML=state.market.length?state.market.slice(0,12).map(x=>'<div class="market"><small>'+esc(x.symbol)+'</small><strong>'+num(x.value)+' '+esc(x.units)+'</strong><small class="'+(x.change>=0?"positive":"negative")+'">'+(x.change>=0?"+":"")+pct(x.change)+'</small><small>Manual · '+esc(x.updated.slice(0,10))+'</small></div>').join(""):"";
  $("accountBreakdown").innerHTML=table(["Account","Last Reported","Estimated"],acc.map(a=>'<tr>'+td(esc(label(a)))+td(money(totals([a]).total),"num")+td(money(marketEstimate([a]).estimated),"num")+'</tr>'));
  const other=state.owners.filter(x=>!x.primary);$("managedSummary").innerHTML=other.map(x=>{let ta=totals(state.accounts.filter(a=>a.ownerId===x.id));return '<div class="row" style="border-bottom:1px solid #edf1f6;padding:9px"><span>'+esc(x.name)+'</span><strong>'+money(ta.total)+'</strong></div>'}).join("")||'<div class="empty">No managed owner groups.</div>';
@@ -346,7 +398,7 @@ function render(){
   };
   return '<tr>'+holdingColumnDefs.filter(([key])=>visibleHoldingColumns.has(key)).map(([key])=>td(cell[key])).join("")+'</tr>';
  }));
-
+ renderDashboardHoldings();
  $("dividendTable").innerHTML='<div class="grid"><div class="card"><small>Annual income · current selection</small><div class="metric">'+money(t.income)+'</div></div><div class="card"><small>Average monthly equivalent</small><div class="metric">'+money(t.income/12)+'</div></div></div>'+table(["Account","Ticker","Distribution/share","Frequency","Annual Est.","Next date","Action"],hs.filter(h=>state.dividends.some(d=>d.holdingId===h.id)).map(h=>{let d=state.dividends.find(d=>d.holdingId===h.id);return '<tr>'+td(esc(label(state.accounts.find(a=>a.id===h.accountId))))+td(esc(h.symbol))+td(money(d.perShare))+td(num(d.frequency)+"/yr")+td(money(dividends(h)))+td(esc(d.nextDate||"Unknown"))+td(b("deleteDividend",d.id,"Delete"))+'</tr>'}));
  $("marketTable").innerHTML=table(["Indicator","Value","Daily %","Updated","Action"],state.market.map(x=>'<tr>'+td(esc(x.symbol))+td(num(x.value)+" "+esc(x.units))+td(pct(x.change))+td(esc(x.updated.slice(0,16).replace("T"," ")))+td(b("deleteMarket",x.id,"Delete"))+'</tr>'))
 }
