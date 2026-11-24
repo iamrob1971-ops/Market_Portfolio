@@ -206,7 +206,7 @@ async function receiveSnapshot(payload){
   const rows=converted.map(a=>a.name+" - "+fmtMoney(a.connected.reportedEquity)+" ("+a.positions.length+" positions)").join("\n");
   const ok=confirm("REPLACE / REFRESH Fidelity records in this browser?\n\n"+rows+
    "\n\n"+converted.length+" connected accounts; reported equity "+fmtMoney(sum)+
-   "\nRemove "+previous.length+" existing Fidelity account records and their old holdings, cash, adjustments and related transaction/dividend records."+
+   "\nRefresh "+previous.length+" existing Fidelity account records, replacing old Fidelity holdings/cash/adjustments. Local dividend profiles on matching connected positions are retained."+
    "\nAll other brokerages stay unchanged. No extra backup will be created.\n\nConfirm only if ALL accounts above are Fidelity.");
   if(!ok){showStatus("Replacement canceled. Nothing changed.");return}
   const built=buildReplacement(converted);
