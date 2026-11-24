@@ -52,20 +52,22 @@ headerSettings.addEventListener("change",async event=>{
  state.headerWatch=headerChoices.map(c=>c.symbol).filter(s=>chosen.has(s));
  await save();
 });
-let spotRunning=false,spotLastAttempt=0;
+let spotRunning=false;const spotLastById={};
 const spotStatus=document.createElement("p");spotStatus.id="spot-refresh-status";spotStatus.className="muted";
 const spotButton=document.createElement("button");spotButton.className="btn secondary";spotButton.textContent="Refresh Gold, Silver & WTI";spotButton.id="refresh-spot";
 const headerActions=el("fh-refresh").parentElement;headerActions.append(spotButton);
 headerActions.append(spotStatus);
-async function fetchSpot(){
- if(spotRunning)return;
- // Each spot data source is separate from Finnhub and consumes none of its 60/minute allowance.
- const age=Date.now()-spotLastAttempt;
- if(age<60000){spotStatus.textContent="Spot sources were checked recently; retry after "+Math.ceil((60000-age)/1000)+" seconds.";return}
- spotRunning=true;spotLastAttempt=Date.now();spotButton.disabled=true;
+async function fetchSpot(onlyId){
+ if(spotRunning)return {error:"Market sources are refreshing."};
+ const ids=onlyId?[onlyId]:["XAU","XAG","WTI"];
+ if(ids.some(id=>!["XAU","XAG","WTI"].includes(id)))return {error:"Unknown commodity"};
+ const now=Date.now(),blocked=ids.filter(id=>now-(spotLastById[id]||0)<60000);
+ if(blocked.length){const seconds=Math.ceil(Math.max(...blocked.map(id=>60000-(now-(spotLastById[id]||0))))/1000);return {error:"Please retry "+blocked.join(", ")+" in "+seconds+" seconds."}}
+ spotRunning=true;ids.forEach(id=>spotLastById[id]=now);spotButton.disabled=true;
  let successes=0,errors=[];
  try{
   for(const [id,api] of [["XAU","https://api.gold-api.com/price/XAU"],["XAG","https://api.gold-api.com/price/XAG"]]){
+   if(onlyId&&onlyId!==id)continue;
    try{
     const controller=new AbortController(),timer=setTimeout(()=>controller.abort(),10000);
     let res;try{res=await fetch(api,{cache:"no-store",signal:controller.signal})}finally{clearTimeout(timer)}
@@ -78,7 +80,7 @@ async function fetchSpot(){
     successes++;
    }catch(e){errors.push(id+": "+String(e.message||e))}
   }
-  try{
+  if(!onlyId||onlyId==="WTI")try{
    const controller=new AbortController(),timer=setTimeout(()=>controller.abort(),10000);
    let res;try{res=await fetch("https://americasoilwatch.com/api/v1/wti",{cache:"no-store",signal:controller.signal})}finally{clearTimeout(timer)}
    if(!res.ok)throw Error("HTTP "+res.status);
@@ -94,10 +96,12 @@ async function fetchSpot(){
    successes++;
   }catch(e){errors.push("WTI: "+String(e.message||e))}
   if(successes){await save()}
-  spotStatus.textContent=successes+" of 3 non-Finnhub market quotes updated."+(errors.length?" Unavailable: "+errors.join("; "):"")+" Finnhub request count unchanged.";
+  spotStatus.textContent=successes+" of "+ids.length+" non-Finnhub market quotes updated."+(errors.length?" Unavailable: "+errors.join("; "):"")+" Finnhub request count unchanged.";
+  return successes?{ok:true}:{error:"No usable market quote: "+errors.join("; ")};
  }finally{spotRunning=false;spotButton.disabled=false}
 }
-spotButton.onclick=fetchSpot;
+spotButton.onclick=()=>void fetchSpot();
+window.marketSpotRefresh=id=>fetchSpot(id);
 
 const status=s=>el("fh-status").textContent=s;
 async function clipboard(t){try{await navigator.clipboard.writeText(t);toast("Copied to clipboard")}catch(e){alert("Clipboard permission unavailable; use HTTPS.")}}
