@@ -342,7 +342,7 @@ function renderDashboardMarketStrip(){
   const change=x?.change==null?null:Number(x.change),hasChange=Number.isFinite(change);
   const pctValue=x?.changePct!=null?Number(x.changePct):hasChange&&valid&&Number(x.price)!==change?100*change/(Number(x.price)-change):null;
   const hasPct=pctValue!==null&&Number.isFinite(pctValue);
-  const shown=valid?(item.points?num(x.price):money(x.price)):"—";
+  const shown=valid?(item.points?Number(x.price).toLocaleString("en-US",{minimumFractionDigits:2,maximumFractionDigits:2}):money(x.price)):"—";
   const changeHTML=hasPct?'<span class="'+(pctValue>=0?"positive":"negative")+'">'+(pctValue>=0?"+":"")+pct(pctValue)+'</span>':'<span class="muted">No daily change</span>';
   return '<div class="dash-ticker" title="'+esc(x?.source||"Saved market observation")+'"><span class="dash-ticker-name">'+esc(item.label)+'</span><button type="button" class="dash-refresh" data-refresh-market="'+esc(item.id)+'" title="Refresh '+esc(item.label)+'" aria-label="Refresh '+esc(item.label)+'">↻</button><strong class="dash-ticker-value">'+shown+'</strong><span class="dash-ticker-move">'+changeHTML+'</span><span class="dash-ticker-time">'+esc(dateText(x?.asof||x?.fetchedAt))+'</span></div>';
  }).join("");
