@@ -120,7 +120,7 @@ function holdingsTable(headers,rows){
 
 function toast(s){$("toast").textContent=s;$("toast").style.display="block";setTimeout(()=>$("toast").style.display="none",2600)}
 function indexedDBOpen(){return new Promise((res,rej)=>{const request=indexedDB.open("MarketPortfolioV1",1);request.onupgradeneeded=()=>request.result.createObjectStore("store");request.onsuccess=()=>res(request.result);request.onerror=()=>rej(request.error)})}
-async function load(){db=await indexedDBOpen();const result=await new Promise((res,rej)=>{let q=db.transaction("store","readonly").objectStore("store").get("data");q.onsuccess=()=>res(q.result);q.onerror=()=>rej(q.error)});if(result&&result.version===1)state={...blank(),...result};render()}
+async function load(){db=await indexedDBOpen();const result=await new Promise((res,rej)=>{let q=db.transaction("store","readonly").objectStore("store").get("data");q.onsuccess=()=>res(q.result);q.onerror=()=>rej(q.error)});if(result&&result.version===1)state={...blank(),...result};if(!/^\d{4}-\d{2}$/.test(state.monthlyCheckpointStart||"")){state.monthlyCheckpointStart=localMonthKey(new Date());await save()}else render()}
 async function save(){await new Promise((res,rej)=>{let tx=db.transaction("store","readwrite");tx.objectStore("store").put(state,"data");tx.oncomplete=res;tx.onerror=()=>rej(tx.error)});render()}
 const allAccounts=()=>state.accounts,visibleOwners=()=>filter==="all"?state.owners.map(o=>o.id):filter==="mine"?state.owners.filter(o=>o.primary).map(o=>o.id):[filter];
 const accounts=()=>state.accounts.filter(a=>visibleOwners().includes(a.ownerId));
@@ -208,7 +208,7 @@ function render(){
  $("marketOverview").innerHTML=state.market.length?state.market.slice(0,12).map(x=>'<div class="market"><small>'+esc(x.symbol)+'</small><strong>'+num(x.value)+' '+esc(x.units)+'</strong><small class="'+(x.change>=0?"positive":"negative")+'">'+(x.change>=0?"+":"")+pct(x.change)+'</small><small>Manual · '+esc(x.updated.slice(0,10))+'</small></div>').join(""):"";
  $("accountBreakdown").innerHTML=table(["Account","Last Reported","Estimated"],acc.map(a=>'<tr>'+td(esc(label(a)))+td(money(totals([a]).total),"num")+td(money(marketEstimate([a]).estimated),"num")+'</tr>'));
  const other=state.owners.filter(x=>!x.primary);$("managedSummary").innerHTML=other.map(x=>{let ta=totals(state.accounts.filter(a=>a.ownerId===x.id));return '<div class="row" style="border-bottom:1px solid #edf1f6;padding:9px"><span>'+esc(x.name)+'</span><strong>'+money(ta.total)+'</strong></div>'}).join("")||'<div class="empty">No managed owner groups.</div>';
- $("snapshots").innerHTML=table(["Date","View","Total","P&L"],state.snapshots.filter(x=>x.filter===filter).slice(-10).reverse().map(x=>'<tr>'+td(esc(x.date))+td(esc(x.filter))+td(money(x.total))+td(money(x.pnl))+'</tr>'));
+ $("snapshots").innerHTML=table(["Captured","Month / Type","Last Reported","Estimated","P&L"],state.snapshots.filter(x=>x.filter===filter).slice(-12).reverse().map(x=>'<tr>'+td(esc(new Date(x.capturedAt||x.date).toLocaleDateString()))+td(esc(x.type==="monthly"?(x.monthKey||"Monthly"):x.type||"Manual"))+td(money(x.reportedValue??x.total))+td(x.estimatedValue==null?"—":money(x.estimatedValue))+td(money(x.estimatedPnl??x.pnl))+'</tr>'));
  const connectedChecks=acc.filter(a=>a.connected?.provider==="snaptrade").map(a=>{
   const c=a.connected,difference=Number(c.reconstructedPositionValue||0)-Number(c.reportedEquity||0);
   return '<p><strong>'+esc(a.name)+'</strong> · SnapTrade equity '+money(c.reportedEquity)+
@@ -317,7 +317,22 @@ $("basketForm").onsubmit=async e=>{e.preventDefault();let name=formData("basketF
 $("assignBasketForm").onsubmit=async e=>{e.preventDefault();let f=formData("assignBasketForm"),h=state.holdings.find(h=>h.id===f.holdingId);if(!h)return;h.basketId=f.basketId||null;await save();toast("Basket assignment saved")};
 $("marketForm").onsubmit=async e=>{e.preventDefault();let f=formData("marketForm"),symbol=f.symbol.trim().toUpperCase(),value=Number(f.value),change=Number(f.change);if(![value,change].every(Number.isFinite))return;let x=state.market.find(x=>x.symbol===symbol);if(x)Object.assign(x,{value,change,units:f.units,updated:new Date().toISOString()});else state.market.push({id:uid(),symbol,value,change,units:f.units,updated:new Date().toISOString()});e.target.reset();await save();toast("Indicator saved")};
 document.body.addEventListener("click",async e=>{let x=e.target.closest("[data-op]");if(!x)return;let {op,id}=x.dataset;if(op==="toggleOwner"){let o=state.owners.find(o=>o.id===id);o.primary=!o.primary;await save();return}if(!confirm("Delete this record? Related records may also be removed."))return;if(op==="deleteAccount"){if(state.transactions.some(t=>t.accountId===id))return alert("Account has transactions; preserve history.");state.accounts=state.accounts.filter(a=>a.id!==id);let keep=new Set(state.accounts.map(a=>a.id));state.holdings=state.holdings.filter(h=>keep.has(h.accountId));state.cash=state.cash.filter(c=>keep.has(c.accountId))}if(op==="deleteHolding"){if(state.transactions.some(t=>t.holdingId===id))return alert("Holding has transactions; preserve history.");state.holdings=state.holdings.filter(h=>h.id!==id)}if(op==="deleteDividend")state.dividends=state.dividends.filter(d=>d.id!==id);if(op==="deleteMarket")state.market=state.market.filter(m=>m.id!==id);if(op==="deleteBasket"){state.baskets=state.baskets.filter(b=>b.id!==id);state.holdings.forEach(h=>{if(h.basketId===id)h.basketId=null})}let keepH=new Set(state.holdings.map(h=>h.id));state.dividends=state.dividends.filter(d=>keepH.has(d.holdingId));await save()});
-$("saveSnapshot").onclick=async()=>{let t=totals();state.snapshots.push({id:uid(),date:new Date().toISOString(),filter,total:t.total,pnl:t.pnl,cash:t.cash,income:t.income});await save();toast("Snapshot recorded")};
+$("saveSnapshot").onclick=async()=>{if(!accounts().length)return alert("No accounts available.");const item=checkpointRecord("manual");state.snapshots.push(item);try{await save();toast("Extra checkpoint saved locally")}catch(e){state.snapshots=state.snapshots.filter(s=>s.id!==item.id);render();alert("Checkpoint save failed: "+String(e.message||e))}};
+document.addEventListener("click",async e=>{
+ const button=e.target.closest("#monthlyCheckpointSave");if(!button)return;
+ const month=button.dataset.month;
+ if(month!==dueMonthlyCheckpoint(filter))return alert("Checkpoint reminder changed; reload and retry.");
+ if(!accounts().length)return alert("No accounts available.");
+ const recorded=state.snapshots.some(s=>s.type==="monthly"&&s.filter===filter&&s.monthKey===month);
+ if(recorded)return alert("This monthly checkpoint is already saved.");
+ const report=totals(),estimated=marketEstimate();
+ if(!confirm("Save "+month+" checkpoint now?\n\nLast reported: "+money(report.total)+"\nEstimated: "+money(estimated.estimated)+"\nCaptured: "+new Date().toLocaleString()+"\n\nThe values are recorded today, not backdated to the first of the month."))return;
+ button.disabled=true;
+ const item=checkpointRecord("monthly",month);
+ state.snapshots.push(item);
+ try{await save();toast("Monthly checkpoint saved locally")}
+ catch(error){state.snapshots=state.snapshots.filter(s=>s.id!==item.id);render();alert("Checkpoint save failed: "+String(error.message||error))}
+});
 function download(name,text,type){let url=URL.createObjectURL(new Blob([text],{type})),a=document.createElement("a");a.href=url;a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(url),1000)}
 $("backup").onclick=()=>download("market-portfolio-backup-"+new Date().toISOString().slice(0,10)+".json",JSON.stringify(state,null,2),"application/json");
 $("restore").onchange=async e=>{let file=e.target.files[0];if(!file)return;try{let data=JSON.parse(await file.text());if(data.version!==1||!["owners","accounts","holdings","cash","dividends","market","snapshots"].every(k=>Array.isArray(data[k])))throw Error("Invalid backup format");if(confirm("Replace all local records with this backup?")){state={...blank(),...data};await save();toast("Backup restored")}}catch(err){alert(err.message)}e.target.value=""};
