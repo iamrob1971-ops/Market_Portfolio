@@ -29,6 +29,21 @@ header h1{font-size:22px;margin:0}header small{color:#b6c8da}main{max-width:1280
 #dashboard .positive{color:var(--dash-positive)}#dashboard .negative{color:var(--dash-negative)}
 #dashboard .dashboard-hero{display:grid;grid-template-columns:minmax(280px,1.1fr) minmax(360px,1.5fr);gap:18px;background:var(--dash-card);border:1px solid var(--dash-border);border-radius:15px;padding:24px;margin-bottom:15px}
 #dashboard .dashboard-value{align-self:center;min-width:0}
+#dashboard .dashboard-value-top{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap}
+#dashboard .dashboard-value-top .dashboard-icon-btn{font-size:12px;padding:5px 9px}
+#dashboard.dashboard-private .dashboard-checkpoint-trend svg{visibility:hidden}
+#dashboard .dash-refresh{float:right;padding:0 5px;line-height:19px;background:transparent;color:var(--dash-sub);border:1px solid var(--dash-border);border-radius:5px}
+#dashboard .dash-refresh:disabled{opacity:.35}
+#dashboard .dashboard-research-panel{border:1px solid var(--dash-border);background:var(--dash-card);color:var(--dash-text);border-radius:12px;padding:16px;margin-bottom:14px}
+#dashboard .dashboard-research-panel input{background:var(--dash-card);color:var(--dash-text);border-color:var(--dash-border)}
+#dashboard .research-actions{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+#dashboard .research-actions input{flex:1;min-width:180px;max-width:460px}
+#dashboard .research-results{display:flex;flex-wrap:wrap;gap:8px;margin:12px 0}
+#dashboard .research-result{background:transparent;border:1px solid var(--dash-border);border-radius:7px;padding:7px 9px;color:var(--dash-text)}
+#dashboard .research-data{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:9px;margin:12px 0}
+#dashboard .research-stat{background:var(--dash-bg);border:1px solid var(--dash-border);border-radius:8px;padding:11px}
+#dashboard .research-stat small{display:block;color:var(--dash-sub)}
+#dashboard .research-stat strong{font-size:18px}
 #dashboard .dashboard-big-number{font-size:clamp(30px,3.5vw,52px);font-weight:760;letter-spacing:-.035em;line-height:1.25;font-variant-numeric:tabular-nums}
 #dashboard .dashboard-movement{font-size:15px;font-weight:680;margin-top:5px}
 #dashboard .dashboard-checkpoint-trend{margin-top:20px;padding-top:10px;border-top:1px solid var(--dash-border);max-width:560px}
@@ -52,6 +67,7 @@ header h1{font-size:22px;margin:0}header small{color:#b6c8da}main{max-width:1280
 #dashboard .dashboard-holdings-table table{min-width:730px;font-size:13px}
 #dashboard .dashboard-holdings-table th,#dashboard .dashboard-holdings-table td{padding:10px 8px}
 #dashboard .dashboard-holdings-table th{position:sticky;top:0;background:var(--dash-card);z-index:1;color:var(--dash-sub)}
+#dashboard .dashboard-holdings-table tfoot td{font-weight:750;border-top:2px solid var(--dash-border);background:var(--dash-card)}
 #dashboard .dashboard-holdings-footer{display:flex;justify-content:space-between;align-items:center;gap:12px;margin-top:10px}
 #dashboard .dashboard-holdings-footer .btn{padding:7px 12px}
 #dashboard .dashboard-secondary-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px}
@@ -85,13 +101,15 @@ header h1{font-size:22px;margin:0}header small{color:#b6c8da}main{max-width:1280
  <div class="dashboard-topline">
   <div><span class="dashboard-eyebrow">PORTFOLIO OVERVIEW</span><h2 class="dashboard-heading">Your investments at a glance</h2></div>
   <div class="dashboard-top-actions">
+   <button type="button" id="dashboardResearchToggle" class="dashboard-icon-btn" aria-controls="dashboardResearchPanel" aria-expanded="false">⌕ Research ticker</button>
    <button type="button" id="dashboardThemeToggle" class="dashboard-icon-btn" aria-label="Switch dashboard color theme" title="Switch dashboard color theme">◐ <span id="dashboardThemeLabel">Dark mode</span></button>
    <div id="monthlyCheckpointBanner" class="monthly-checkpoint"></div>
   </div>
  </div>
+ <div id="dashboardResearchPanel" class="dashboard-research-panel hidden"></div>
  <div class="dashboard-ticker-strip" id="dashboardMarketStrip" aria-label="Market indexes and commodities"></div>
  <div class="dashboard-hero">
-  <div class="dashboard-value"><span class="dashboard-eyebrow">ESTIMATED PORTFOLIO VALUE</span><div class="dashboard-big-number" id="dashboardHeadlineValue">—</div><div id="dashboardHeadlineMove" class="dashboard-movement"></div><small class="dashboard-fineprint">Market-adjusted estimate · not an official brokerage balance</small><div id="dashboardCheckpointTrend" class="dashboard-checkpoint-trend" aria-label="Saved checkpoint history"></div></div>
+  <div class="dashboard-value"><div class="dashboard-value-top"><span class="dashboard-eyebrow">ESTIMATED PORTFOLIO VALUE</span><button type="button" id="dashboardPrivacyToggle" class="dashboard-icon-btn" aria-pressed="false">◉ Hide balances</button></div><div class="dashboard-big-number" id="dashboardHeadlineValue">—</div><div id="dashboardHeadlineMove" class="dashboard-movement"></div><small class="dashboard-fineprint">Market-adjusted estimate · not an official brokerage balance</small><div id="dashboardCheckpointTrend" class="dashboard-checkpoint-trend" aria-label="Saved checkpoint history"></div></div>
   <div class="dashboard-kpi-grid" id="metrics"></div>
  </div>
  <div class="card dashboard-holdings-card">
@@ -310,12 +328,12 @@ function renderDashboardMarketStrip(){
  const host=$("dashboardMarketStrip");if(!host)return;
  const indexes=state.indexQuotes||{},spots=state.spotSummary||{};
  const input=[
-  {label:"S&P 500",data:indexes["^GSPC"],points:true},
-  {label:"Dow Jones",data:indexes["^DJI"],points:true},
-  {label:"Nasdaq",data:indexes["^IXIC"],points:true},
-  {label:"Gold",data:spots.XAU},
-  {label:"Silver",data:spots.XAG},
-  {label:"WTI Oil",data:spots.WTI}
+  {label:"S&P 500",data:indexes["^GSPC"],points:true,id:"^GSPC"},
+  {label:"Dow Jones",data:indexes["^DJI"],points:true,id:"^DJI"},
+  {label:"Nasdaq",data:indexes["^IXIC"],points:true,id:"^IXIC"},
+  {label:"Gold",data:spots.XAU,id:"XAU"},
+  {label:"Silver",data:spots.XAG,id:"XAG"},
+  {label:"WTI Oil",data:spots.WTI,id:"WTI"}
  ];
  const dateText=d=>{const t=Date.parse(d||"");return Number.isFinite(t)?new Intl.DateTimeFormat("en-US",{month:"numeric",day:"numeric",hour:"numeric",minute:"2-digit"}).format(new Date(t)):"No timestamp"};
  host.innerHTML=input.map(item=>{
@@ -325,7 +343,7 @@ function renderDashboardMarketStrip(){
   const hasPct=pctValue!==null&&Number.isFinite(pctValue);
   const shown=valid?(item.points?num(x.price):money(x.price)):"—";
   const changeHTML=hasPct?'<span class="'+(pctValue>=0?"positive":"negative")+'">'+(pctValue>=0?"+":"")+pct(pctValue)+'</span>':'<span class="muted">No daily change</span>';
-  return '<div class="dash-ticker" title="'+esc(x?.source||"Saved market observation")+'"><span class="dash-ticker-name">'+esc(item.label)+'</span><strong class="dash-ticker-value">'+shown+'</strong><span class="dash-ticker-move">'+changeHTML+'</span><span class="dash-ticker-time">'+esc(dateText(x?.asof||x?.fetchedAt))+'</span></div>';
+  return '<div class="dash-ticker" title="'+esc(x?.source||"Saved market observation")+'"><span class="dash-ticker-name">'+esc(item.label)+'</span><button type="button" class="dash-refresh" data-refresh-market="'+esc(item.id)+'" title="Refresh '+esc(item.label)+'" aria-label="Refresh '+esc(item.label)+'">↻</button><strong class="dash-ticker-value">'+shown+'</strong><span class="dash-ticker-move">'+changeHTML+'</span><span class="dash-ticker-time">'+esc(dateText(x?.asof||x?.fetchedAt))+'</span></div>';
  }).join("");
 }
 let dashboardHoldingsExpanded=false;
@@ -414,7 +432,7 @@ function render(){
     source:q?'Finnhub · '+esc(new Date(q.asof).toLocaleString()):esc(h.quoteSource||"Recorded"),
     action:h.source==="snaptrade"?"Synced":b("deleteHolding",h.id,"Delete")
   };
-  return '<tr>'+holdingColumnDefs.filter(([key])=>visibleHoldingColumns.has(key)).map(([key])=>td(cell[key])).join("")+'</tr>';
+  return '<tr data-holding-id="'+esc(h.id)+'">'+holdingColumnDefs.filter(([key])=>visibleHoldingColumns.has(key)).map(([key])=>td(cell[key])).join("")+'</tr>';
  }));
  renderDashboardHoldings();
  $("dividendTable").innerHTML='<div class="grid"><div class="card"><small>Annual income · current selection</small><div class="metric">'+money(t.income)+'</div></div><div class="card"><small>Average monthly equivalent</small><div class="metric">'+money(t.income/12)+'</div></div></div>'+table(["Account","Ticker","Distribution/share","Frequency","Annual Est.","Next date","Action"],hs.filter(h=>state.dividends.some(d=>d.holdingId===h.id)).map(h=>{let d=state.dividends.find(d=>d.holdingId===h.id);return '<tr>'+td(esc(label(state.accounts.find(a=>a.id===h.accountId))))+td(esc(h.symbol))+td(money(d.perShare))+td(num(d.frequency)+"/yr")+td(money(dividends(h)))+td(esc(d.nextDate||"Unknown"))+td(b("deleteDividend",d.id,"Delete"))+'</tr>'}));
