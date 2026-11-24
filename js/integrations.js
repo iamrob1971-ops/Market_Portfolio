@@ -204,7 +204,15 @@ el("fh-apply").onclick=async()=>{
    if(!state.headerQuotes||typeof state.headerQuotes!=="object")state.headerQuotes={};
    state.headerQuotes[q.symbol]={price:q.price,previousClose:q.previousClose??null,asof:q.asof,source:q.source};
   }
-  for(let h of state.holdings.filter(h=>h.symbol.toUpperCase()===q.symbol&&h.kind!=="money"&&(!h.currency||h.currency==="USD"))){h.price=q.price;h.marketValue=null;h.previousClose=q.previousClose>0?q.previousClose:null;h.quoteSource=q.source;h.quoteAsOf=q.asof;changed++}
+  for(let h of state.holdings.filter(h=>h.symbol.toUpperCase()===q.symbol&&h.kind!=="money"&&(!h.currency||h.currency==="USD"))){
+   if(h.source==="snaptrade"||state.accounts.some(a=>a.id===h.accountId&&a.connected?.provider==="snaptrade")){
+    // Preserve broker prices/equity. Finnhub provides only independent
+    // reference close data for an explicitly selected symbol.
+    if(q.previousClose>0){h.previousClose=q.previousClose;h.previousCloseAsOf=q.asof;h.previousCloseSource=q.source;changed++}
+    continue;
+   }
+   h.price=q.price;h.marketValue=null;h.previousClose=q.previousClose>0?q.previousClose:null;h.previousCloseAsOf=q.asof;h.previousCloseSource=q.source;h.quoteSource=q.source;h.quoteAsOf=q.asof;changed++
+  }
   state.quoteHistory.push({id:uid(),symbol:q.symbol,price:q.price,previousClose:q.previousClose??null,asof:q.asof,currency:"USD",source:q.source,importedAt:new Date().toISOString()});
  }
  await save();quotes=[];el("fh-apply").disabled=true;el("fh-table").innerHTML='<div class="empty">Quotes applied. Fetch again to refresh.</div>';toast(changed+" positions updated");
