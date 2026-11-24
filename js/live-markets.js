@@ -22,18 +22,18 @@ $("fw-del-group").onclick=async()=>{let g=group();if(!g||!confirm("Delete watchl
 $("fw-list").onclick=async e=>{let b=e.target.closest("[data-rm]");if(!b)return;let g=group();g.symbols=g.symbols.filter(x=>x!==b.dataset.rm);await save();renderGroups();subscribeCurrent()};
 const live=new Map(),closeReferences=new Map();let sock=null,manualStop=true,retry=null,retries=0,ticks=0,loadingCloses=false;
 const streamStatus=s=>$("fw-status").textContent=s;
-function getPrice(s){const t=live.get(s);if(t)return t;let h=holdings().find(h=>h.symbol.toUpperCase()===s);return h?{price:Number(h.price),asof:h.quoteAsOf||null,source:h.quoteSource||"Saved"}:null}
+function getPrice(s){const q=state.marketQuotes?.[s];if(q&&Number(q.price)>0&&Number.isFinite(Date.parse(q.asof))&&Date.now()-Date.parse(q.asof)<86400000)return q;const t=live.get(s);if(t)return t;let h=holdings().find(h=>h.symbol.toUpperCase()===s);return h?{price:effectivePrice(h),asof:h.quoteAsOf||null,source:h.quoteSource||"Saved"}:null}
 const money2=n=>Number(n).toLocaleString("en-US",{minimumFractionDigits:2,maximumFractionDigits:2});
 function reference(s){return closeReferences.get(s)||null}
 function renderLive(){
  const rows=focusSymbols().map(s=>{
-  const q=getPrice(s),ref=reference(s),last=q&&Number(q.price)>0?Number(q.price):null,prev=ref?.previousClose??null;
+  const q=getPrice(s),ref=reference(s),last=q&&Number(q.price)>0?Number(q.price):null,prev=state.marketQuotes?.[s]?.previousClose??ref?.previousClose??null;
   const delta=last!==null&&prev!==null&&prev>0?last-prev:null;
   const ch=delta===null?"—":'<span class="'+(delta>=0?"positive":"negative")+'">'+(delta>=0?"+":"")+money2(delta)+'</span>';
   const pc=delta===null?"—":'<span class="'+(delta>=0?"positive":"negative")+'">'+(delta>=0?"+":"")+(delta/prev*100).toFixed(2)+'%</span>';
-  return '<tr><td>'+safe(s)+'</td><td>'+(last===null?"—":num(last))+'</td><td>'+(prev===null?"—":num(prev))+'</td><td>'+ch+'</td><td>'+pc+'</td><td>'+safe(q?.source||"Unavailable")+'</td><td>'+safe(q?.asof?new Date(q.asof).toLocaleString():"Unknown")+'</td></tr>';
+  return '<tr><td>'+safe(s)+' <button type="button" class="ticker-refresh" data-refresh-ticker="'+safe(s)+'" aria-label="Refresh '+safe(s)+' quote" title="Refresh only '+safe(s)+'">↻</button></td><td>'+(last===null?"—":num(last))+'</td><td>'+(prev===null?"—":num(prev))+'</td><td>'+ch+'</td><td>'+pc+'</td><td>'+safe(q?.source||"Unavailable")+'</td><td>'+safe(q?.asof?new Date(q.asof).toLocaleString():"Unknown")+'</td></tr>';
  });
- $("fw-table").innerHTML='<div class="tablewrap"><table><thead><tr><th>Symbol</th><th>Last $</th><th>Prior close $</th><th>Change $</th><th>Change %</th><th>Last source</th><th>Trade / price time</th></tr></thead><tbody>'+rows.join("")+'</tbody></table></div>';
+ $("fw-table").innerHTML='<div class="tablewrap"><table><thead><tr><th>Symbol / Refresh</th><th>Last $</th><th>Prior close $</th><th>Change $</th><th>Change %</th><th>Last source</th><th>Trade / price time</th></tr></thead><tbody>'+rows.join("")+'</tbody></table></div>';
 }
 async function loadPriorCloses(){
  if(loadingCloses)return;
@@ -69,6 +69,7 @@ async function loadPriorCloses(){
  }finally{loadingCloses=false;$("fw-close-refresh").disabled=false}
 }
 $("fw-close-refresh").onclick=()=>void loadPriorCloses();
+document.addEventListener("market-quote-updated",()=>renderLive());
 function subscribeCurrent(){if(!sock||sock.readyState!==WebSocket.OPEN)return;let before=new Set(sock._symbols||[]),want=new Set(focusSymbols());for(let s of before)if(!want.has(s))sock.send(JSON.stringify({type:"unsubscribe",symbol:s}));for(let s of want)if(!before.has(s))sock.send(JSON.stringify({type:"subscribe",symbol:s}));sock._symbols=[...want];streamStatus("Connected; "+want.size+" symbols; "+ticks+" trade updates received.")}
 function closeStream(stop){manualStop=stop;if(retry){clearTimeout(retry);retry=null}if(sock){let old=sock;sock=null;old.onclose=null;old.close()}streamStatus(stop?"Stopped.":"Paused: page not visible.")}
 function openStream(){if(document.hidden)return;if(sock)return;let key=$("fh-key")?.value.trim();if(!key)return streamStatus("Enter Finnhub API key in Price Refresh first.");if(!focusSymbols().length)return streamStatus("Add symbols to a watchlist first.");manualStop=false;
