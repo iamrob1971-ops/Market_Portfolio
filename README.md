@@ -1,3 +1,11 @@
+## AI Research sidebar — Phase 1 (Nov 24, 2026)
+
+Use **✨ AI Research** in the header for portfolio or market questions, or **✨ AI** beside a holding ticker in the Dashboard or Holdings tab. The same ticker across accounts opens one default security thread. The sidebar supports editable templates, saved questions, recent/history navigation, rename, new session, fork and deletion.
+
+**Local-only in Phase 1:** questions are saved, **not sent**, and AI replies are **not generated**. No position details, cost basis or account values leave the browser. IndexedDB stores threads under `state.aiThreads` and normal JSON backups/restores include this field. Site data clearing may delete local threads. Neither SharePoint sync nor Azure/Gemini chat is connected for this sidebar.
+
+**Test:** back up locally; open the same ticker from both Holdings views; edit and save a question; fork/rename it; reload and confirm saved questions; inspect an exported JSON backup for `aiThreads`. Also check existing saved column views, Fidelity refresh, market strip, and checkpoints.
+
 ## FMP index testing and remembered browser keys (Nov 2026)
 
 The **Actual Indexes** tab now tests the three *individual* FMP \`/stable/quote?symbol=...\` endpoints rather than the unavailable \`/stable/batch-index-quotes\` endpoint. Click **Test once** at any hour to check whether your key can return \`^DJI\`, \`^GSPC\` and \`^IXIC\`. The experimental automatic mode runs only while the page is visible during regular US market hours, with a default 6-minute interval, three API calls per cycle, and a conservative 210-request local daily ceiling. A rejected or incomplete response stops automatic requests. The free plan may not authorize index data; 402 is reported explicitly.
