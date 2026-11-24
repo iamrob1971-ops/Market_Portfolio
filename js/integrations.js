@@ -122,6 +122,45 @@ diagnosticButton.onclick=async()=>{
 };
 
 const requestGapMs=1500;
+// Independent market quote cache; SnapTrade quantity, price, equity and basis are immutable here.
+let singleRefreshing=false;
+function storeMarketQuote(symbol,q){
+ if(!state.marketQuotes||typeof state.marketQuotes!=="object")state.marketQuotes={};
+ const previous=state.marketQuotes[symbol];
+ if(previous?.asof&&Date.parse(previous.asof)>Date.parse(q.asof))return false;
+ state.marketQuotes[symbol]={price:Number(q.price),previousClose:Number(q.previousClose)>0?Number(q.previousClose):null,asof:q.asof,source:"Finnhub REST /quote",fetchedAt:new Date().toISOString()};
+ return true;
+}
+async function refreshTicker(symbol){
+ symbol=String(symbol||"").trim().toUpperCase();
+ if(!/^[A-Z][A-Z0-9.-]{0,14}$/.test(symbol))return;
+ if(singleRefreshing||busy){toast("Another quote refresh is in progress.");return}
+ const key=el("fh-key")?.value.trim();
+ if(!key){toast("Enter your Finnhub API key in Price Refresh first.");return}
+ const buttons=[...document.querySelectorAll("[data-refresh-ticker]")].filter(b=>b.dataset.refreshTicker===symbol);
+ singleRefreshing=true;buttons.forEach(b=>b.disabled=true);
+ try{
+  const wait=Math.max(0,1500-(Date.now()-lastStart));if(wait)await delay(wait);
+  lastStart=Date.now();
+  const ctrl=new AbortController(),timeout=setTimeout(()=>ctrl.abort(),12000);
+  let response;
+  try{response=await fetch("https://api.finnhub.io/api/v1/quote?symbol="+encodeURIComponent(symbol)+"&token="+encodeURIComponent(key),{cache:"no-store",signal:ctrl.signal})}
+  finally{clearTimeout(timeout)}
+  if(!response.ok)throw Error("Finnhub HTTP "+response.status+(response.status===429?" (rate limited)":""));
+  const data=await response.json();
+  if(!(Number(data.c)>0)||!(Number(data.t)>0))throw Error("No usable Finnhub quote for "+symbol);
+  const asof=new Date(Number(data.t)*1000).toISOString(),age=Date.now()-Date.parse(asof);
+  if(age>24*3600000||age< -300000)throw Error("Returned quote is stale or future-dated: "+asof);
+  if(!storeMarketQuote(symbol,{price:Number(data.c),previousClose:data.pc,asof})){toast(symbol+": saved quote is already newer.");return}
+  await save();
+  toast(symbol+" updated: "+money(data.c)+" · "+new Date(asof).toLocaleTimeString());
+  document.dispatchEvent(new CustomEvent("market-quote-updated",{detail:{symbol}}));
+ }catch(error){toast(symbol+": "+String(error.message||error))}
+ finally{singleRefreshing=false;buttons.forEach(b=>b.disabled=false)}
+}
+window.marketQuoteRefresh=refreshTicker;
+document.addEventListener("click",e=>{const b=e.target.closest("[data-refresh-ticker]");if(b){e.preventDefault();void refreshTicker(b.dataset.refreshTicker)}});
+
 const delay=ms=>new Promise(resolve=>setTimeout(resolve,ms));
 const textStatus=(completed,total,good,failed,detail)=>status(completed+" of "+total+" tickers checked · "+good+" prices · "+failed+" unavailable"+(detail?" · "+detail:""));
 el("fh-stop").onclick=()=>{stopRequested=true;status("Stop requested. Completing the active request, then displaying retrieved quotes.")};
@@ -200,14 +239,14 @@ el("fh-apply").onclick=async()=>{
  if(!confirm("Apply "+selected.length+" Finnhub prices across matching USD holdings? Share quantities and cost basis will not change."))return;
  let changed=0;
  for(let q of selected){
+  storeMarketQuote(q.symbol,q);
   if(selectedHeaderSymbols().includes(q.symbol)){
    if(!state.headerQuotes||typeof state.headerQuotes!=="object")state.headerQuotes={};
    state.headerQuotes[q.symbol]={price:q.price,previousClose:q.previousClose??null,asof:q.asof,source:q.source};
   }
   for(let h of state.holdings.filter(h=>h.symbol.toUpperCase()===q.symbol&&h.kind!=="money"&&(!h.currency||h.currency==="USD"))){
    if(h.source==="snaptrade"||state.accounts.some(a=>a.id===h.accountId&&a.connected?.provider==="snaptrade")){
-    // Preserve broker prices/equity. Finnhub provides only independent
-    // reference close data for an explicitly selected symbol.
+    // Preserve broker prices/equity. Separate marketQuotes drives estimates.
     if(q.previousClose>0){h.previousClose=q.previousClose;h.previousCloseAsOf=q.asof;h.previousCloseSource=q.source;changed++}
     continue;
    }
