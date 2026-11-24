@@ -461,7 +461,43 @@ $("basketForm").onsubmit=async e=>{e.preventDefault();let name=formData("basketF
 $("assignBasketForm").onsubmit=async e=>{e.preventDefault();let f=formData("assignBasketForm"),h=state.holdings.find(h=>h.id===f.holdingId);if(!h)return;h.basketId=f.basketId||null;await save();toast("Basket assignment saved")};
 $("marketForm").onsubmit=async e=>{e.preventDefault();let f=formData("marketForm"),symbol=f.symbol.trim().toUpperCase(),value=Number(f.value),change=Number(f.change);if(![value,change].every(Number.isFinite))return;let x=state.market.find(x=>x.symbol===symbol);if(x)Object.assign(x,{value,change,units:f.units,updated:new Date().toISOString()});else state.market.push({id:uid(),symbol,value,change,units:f.units,updated:new Date().toISOString()});e.target.reset();await save();toast("Indicator saved")};
 document.body.addEventListener("click",async e=>{let x=e.target.closest("[data-op]");if(!x)return;let {op,id}=x.dataset;if(op==="toggleOwner"){let o=state.owners.find(o=>o.id===id);o.primary=!o.primary;await save();return}if(!confirm("Delete this record? Related records may also be removed."))return;if(op==="deleteAccount"){if(state.transactions.some(t=>t.accountId===id))return alert("Account has transactions; preserve history.");state.accounts=state.accounts.filter(a=>a.id!==id);let keep=new Set(state.accounts.map(a=>a.id));state.holdings=state.holdings.filter(h=>keep.has(h.accountId));state.cash=state.cash.filter(c=>keep.has(c.accountId))}if(op==="deleteHolding"){if(state.transactions.some(t=>t.holdingId===id))return alert("Holding has transactions; preserve history.");state.holdings=state.holdings.filter(h=>h.id!==id)}if(op==="deleteDividend")state.dividends=state.dividends.filter(d=>d.id!==id);if(op==="deleteMarket")state.market=state.market.filter(m=>m.id!==id);if(op==="deleteBasket"){state.baskets=state.baskets.filter(b=>b.id!==id);state.holdings.forEach(h=>{if(h.basketId===id)h.basketId=null})}let keepH=new Set(state.holdings.map(h=>h.id));state.dividends=state.dividends.filter(d=>keepH.has(d.holdingId));await save()});
-$("saveSnapshot").onclick=async()=>{if(!accounts().length)return alert("No accounts available.");const item=checkpointRecord("manual");state.snapshots.push(item);try{await save();toast("Extra checkpoint saved locally")}catch(e){state.snapshots=state.snapshots.filter(s=>s.id!==item.id);render();alert("Checkpoint save failed: "+String(e.message||e))}};
+document.addEventListener("click",async e=>{
+ const button=e.target.closest("#saveSnapshot");if(!button)return;
+ if(!accounts().length)return alert("No accounts available.");
+ if(!confirm("Save an additional portfolio checkpoint at "+new Date().toLocaleString()+"?\n\nLast reported: "+money(totals().total)+"\nEstimated: "+money(marketEstimate().estimated)+"\n\nThis does not complete the monthly checkpoint reminder."))return;
+ button.disabled=true;
+ const item=checkpointRecord("manual");state.snapshots.push(item);
+ try{await save();toast("Extra checkpoint saved locally")}
+ catch(err){state.snapshots=state.snapshots.filter(x=>x.id!==item.id);render();alert("Checkpoint save failed: "+String(err.message||err))}
+});
+document.addEventListener("click",e=>{
+ const t=e.target;
+ if(t.closest("#checkpointMenuToggle")){
+  const pop=$("checkpointMenu"),b=$("checkpointMenuToggle"),opening=pop.classList.contains("hidden");
+  pop.classList.toggle("hidden",!opening);b.setAttribute("aria-expanded",String(opening));return;
+ }
+ if(t.closest("#checkpointHistoryOpen")){
+  const box=$("dashboardCheckpointHistory");box.open=true;box.scrollIntoView({behavior:"smooth",block:"start"});
+ }
+ if(!t.closest("#monthlyCheckpointBanner")){
+  const pop=$("checkpointMenu"),b=$("checkpointMenuToggle");
+  if(pop){pop.classList.add("hidden");b?.setAttribute("aria-expanded","false")}
+ }
+});
+$("dashboardThemeToggle").onclick=async()=>{
+ const previous=state.dashboardTheme;
+ state.dashboardTheme=state.dashboardTheme==="dark"?"light":"dark";
+ try{await save()}catch(err){state.dashboardTheme=previous;render();alert("Theme setting could not be saved: "+String(err.message||err))}
+};
+$("dashboardHoldingsSearch").addEventListener("input",()=>renderDashboardHoldings());
+$("dashboardHoldingsMore").onclick=()=>{dashboardHoldingsExpanded=!dashboardHoldingsExpanded;renderDashboardHoldings()};
+$("dashboardHoldingsFull").onclick=()=>tab("holdings");
+$("dashboardHoldingsColumns").onclick=()=>{
+ tab("holdings");
+ const config=$("holdings-column-config");
+ if(config.classList.contains("hidden"))$("holdings-config-toggle").click();
+ config.scrollIntoView({behavior:"smooth",block:"center"});
+};
 document.addEventListener("click",async e=>{
  const button=e.target.closest("#monthlyCheckpointSave");if(!button)return;
  const month=button.dataset.month;
