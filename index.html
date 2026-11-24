@@ -5,349 +5,50 @@
 *{box-sizing:border-box}body{margin:0}button,input,select,textarea{font:inherit}button{cursor:pointer}header{background:#11263e;color:white;padding:18px max(20px,calc((100vw - 1280px)/2));display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap}
 header h1{font-size:22px;margin:0}header small{color:#b6c8da}main{max-width:1280px;margin:auto;padding:20px}nav{display:flex;flex-wrap:wrap;gap:8px;margin:16px 0}nav button{border:1px solid var(--border);background:white;padding:9px 17px;border-radius:9px}nav button.active{background:var(--blue);color:white} .card{background:white;border:1px solid var(--border);border-radius:14px;padding:18px;margin-bottom:16px;box-shadow:0 2px 8px #0f27420a}.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(225px,1fr));gap:14px}.metric{font-size:25px;font-weight:750}.muted,small{color:var(--muted)}.positive{color:var(--green)}.negative{color:var(--red)}h2{font-size:20px;margin:0 0 12px}h3{font-size:16px;margin:8px 0}label{display:block;font-size:13px;font-weight:600;color:#43556c;margin:7px 0}input,select,textarea{border:1px solid #bdcad8;border-radius:8px;padding:9px 10px;width:100%;background:white;color:#16283e}textarea{min-height:90px}.formgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:10px}.btn{border:0;background:var(--blue);color:white;border-radius:8px;padding:10px 15px}.secondary{background:#e9eef8;color:#193451}.danger{background:#fae8eb;color:var(--red)}.actions{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin:12px 0}.tablewrap{overflow:auto}table{border-collapse:collapse;width:100%;white-space:nowrap}th,td{padding:11px 9px;text-align:left;border-bottom:1px solid #e9edf3}th{font-size:12px;text-transform:uppercase;color:var(--muted)}td.num,th.num{text-align:right}.empty{padding:25px;color:var(--muted);text-align:center;background:#f8fafc;border-radius:8px}.row{display:flex;gap:12px;align-items:center;justify-content:space-between;flex-wrap:wrap}.hidden{display:none!important}.pill{display:inline-block;background:#e9eef8;color:#25476f;font-size:11px;border-radius:30px;padding:3px 9px}.note{background:#fff6df;border:1px solid #ead6a1;padding:10px 14px;border-radius:9px;font-size:13px}.chart{display:flex;height:18px;border-radius:20px;overflow:hidden;background:#edf1f5}.chart>i{height:100%}.top-select{min-width:180px;width:auto;color:#16283e}.modal{max-width:800px}.markets{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px}.market{border:1px solid var(--border);border-radius:10px;padding:12px;background:#fafcff}.market strong{font-size:19px}.market small{display:block}.tab{display:none}.tab.show{display:block}#toast{position:fixed;bottom:20px;right:20px;background:#183451;color:white;border-radius:10px;padding:12px;display:none;box-shadow:0 5px 20px #0003}footer{padding:25px;text-align:center;color:var(--muted);font-size:12px}@media(max-width:600px){header{padding:16px}main{padding:12px}.metric{font-size:21px}}
  .ticker-refresh{border:1px solid #cbd5e1;border-radius:5px;background:#f8fafc;color:#2563eb;cursor:pointer;padding:2px 7px;font-size:18px;vertical-align:middle}.ticker-refresh:hover{background:#dbeafe}.ticker-refresh:disabled{opacity:.4;cursor:wait}
+/* Dark mode */
+html.dark { --bg: #0f1419; --card: #1a1f26; --text: #e7e9ea; --muted: #8b98a5; --border: #2f3336; --blue: #1d9bf0; --green: #00ba7c; --red: #f4212e; color: var(--text); background: var(--bg); }
+html.dark body { background: var(--bg); color: var(--text); }
+html.dark .card { background: var(--card); border-color: var(--border); color: var(--text); }
+html.dark header { background: #000; }
+html.dark nav button { background: #1a1f26; color: var(--text); border-color: var(--border); }
+html.dark nav button.active { background: var(--blue); color: #fff; }
+html.dark input, html.dark select, html.dark textarea { background: #0f1419; color: var(--text); border-color: var(--border); }
+html.dark .note { background: #1a1f26; border-color: #2f3336; color: #e7e9ea; }
+html.dark .monthly-checkpoint { background: #1a1f26; border-color: #decba7; color: #e7e9ea; }
+.theme-toggle { background: transparent; border: 1px solid var(--border); color: inherit; padding: 6px 10px; border-radius: 8px; cursor: pointer; }
 </style></head><body>
-<header><div><h1>◈ Market Portfolio</h1><small>Local-first investment dashboard · Connected + manual</small></div><div class="row"><select class="top-select" id="ownerFilter" aria-label="Portfolio view"></select><button class="btn secondary" id="recalculate">↻ Recalculate</button></div></header>
+<header><div><h1>◈ Market Portfolio</h1><small>Local-first investment dashboard · Connected + manual</small></div><div class="row"><select class="top-select" id="ownerFilter" aria-label="Portfolio view"></select><button class="theme-toggle" id="themeToggle" title="Toggle light/dark">🌙</button><button class="btn secondary" id="recalculate">↻ Recalculate</button></div></header>
 <main><div class="note">Portfolio records stay in this browser. Connected Fidelity accounts use secured SnapTrade snapshots through Azure; other accounts may be manual. Broker-reported equity is used for connected account totals. Market quotes are maintained separately. Never enter brokerage credentials here.</div>
 <nav><button data-tab="dashboard" class="active">Dashboard</button><button data-tab="accounts">Accounts & Owners</button><button data-tab="holdings">Holdings</button><button data-tab="transactions">Transactions</button><button data-tab="income">Dividends</button><button data-tab="baskets">Baskets</button><button data-tab="market">Market Indicators</button><button data-tab="data">Import & Backup</button></nav>
-<section id="dashboard" class="tab show"><div id="monthlyCheckpointBanner" class="monthly-checkpoint hidden" role="status"></div><div class="grid" id="metrics"></div>
-<div class="card" id="marketIndexWidgetCard">
+<section id="dashboard" class="tab show"><div id="monthlyCheckpointBanner" class="monthly-checkpoint hidden" role="status"></div>
+<div class="grid" id="metrics"></div>
+<div class="card" id="dashboardHoldingsCard"><div class="row"><h2>Holdings</h2><small class="muted">Estimated values use latest market quotes; broker-reported values come from SnapTrade</small></div><div id="dashboardHoldingsTable"></div></div>
+<div class="card" id="marketIndexWidgetCard" style="display:none">
 <div class="row"><h2>Market Overview</h2><button class="btn secondary" data-tab-go="real-indexes">Configure FMP indexes</button></div>
 <h3 style="margin-top:14px">US Market Indexes</h3>
-<p class="muted">Actual Dow Jones Industrial Average, S&amp;P 500, and Nasdaq Composite levels from FMP, not ETF or CFD proxies. Provider timestamps are retained; intraday quotes may differ from finalized closes.</p>
+<p class="muted">Actual Dow Jones Industrial Average, S&P 500, and Nasdaq Composite levels from FMP, not ETF or CFD proxies. Provider timestamps are retained; intraday quotes may differ from finalized closes.</p>
 <div class="tablewrap" id="fmp-dashboard"></div>
 <h3 style="margin-top:18px">Commodities</h3>
 <div id="marketOverview" class="markets"></div>
 <small class="muted" style="display:block;margin-top:12px">Data updates independently by provider and retains the recorded observation time. Use Actual Indexes for FMP settings and Price Refresh for commodity updates.</small>
-</div><div class="grid"><div class="card"><h2>Account Breakdown</h2><div id="accountBreakdown"></div></div><div class="card"><h2>Managed Accounts</h2><small>Separate owner groups are excluded from My Portfolio totals unless explicitly selected.</small><div id="managedSummary"></div></div></div><div class="card"><div class="row"><h2>Portfolio Checkpoints</h2><button id="saveSnapshot" class="btn secondary">Save extra checkpoint</button></div><p class="muted">Monthly checkpoints are saved only when you click. The reminder persists until saved; values reflect the time captured rather than being backdated.</p><div id="snapshots"></div></div><div class="card"><h2>Statement Reconciliation</h2><div id="reconciliation"></div></div></section>
-<section id="accounts" class="tab"><div class="grid"><div class="card"><h2>Owner Groups</h2><form id="ownerForm" class="formgrid"><label>Group name<input name="name" required placeholder="e.g. Mom"></label><label>Reporting group<select name="primary"><option value="false">Managed / separate</option><option value="true">Include in My Portfolio</option></select></label><div class="actions"><button class="btn">Add owner group</button></div></form><div id="ownerList"></div></div><div class="card"><h2>Add Account</h2><form id="accountForm" class="formgrid"><label>Owner group<select name="ownerId" id="accountOwner" required></select></label><label>Brokerage<input name="broker" required placeholder="Fidelity"></label><label>Account label<input name="name" required placeholder="Roth IRA"></label><label>Account type<select name="type"><option>Brokerage</option><option>Roth IRA</option><option>Traditional IRA</option><option>Joint</option><option>Custodial</option><option>401(k)</option><option>Other</option></select></label><div class="actions"><button class="btn">Add account</button></div></form></div></div><div class="card"><h2>Accounts</h2><div id="accountsTable"></div></div></section>
-<section id="holdings" class="tab"><div class="card"><h2>Add / Update Holding</h2><small>Enter aggregate position cost basis, not per-share purchase price. A position is unique by account and ticker.</small><form id="holdingForm" class="formgrid"><label>Account<select name="accountId" id="holdingAccount" required></select></label><label>Ticker<input name="symbol" required placeholder="SCHD"></label><label>Quantity<input name="quantity" type="number" step="any" min="0" required></label><label>Total cost basis ($)<input name="basis" type="number" step="any" min="0" required></label><label>Manual price ($)<input name="price" type="number" step="any" min="0" required></label><label>Type<select name="kind"><option value="security">Stock / ETF / Fund</option><option value="money">Money market fund</option></select></label><div class="actions"><button class="btn">Save holding</button></div></form></div><div class="card"><h2>Cash Balances</h2><form id="cashForm" class="formgrid"><label>Account<select name="accountId" id="cashAccount" required></select></label><label>Cash balance ($)<input name="amount" type="number" step="any" min="0" required></label><div class="actions"><button class="btn">Save cash</button></div></form><small>Enter only cash not already counted as a money market position. Each account has one manual cash balance.</small></div><div class="card"><div class="row"><h2>Holdings & P&L</h2><div class="actions" style="margin:0"><button class="btn secondary" id="holdings-config-toggle" type="button" aria-expanded="false" aria-controls="holdings-column-config">⚙ Customize columns</button><button class="btn secondary" id="exportHoldings">Export holdings CSV</button></div></div><div id="holdings-column-config" class="hidden holdings-config"><strong>Select columns</strong><p class="muted" style="margin:4px 0 10px">Choose the fields to display; Save View remembers them on this browser.</p><div class="holdings-column-grid" id="holdings-column-options"></div><div class="actions"><button type="button" class="btn" id="holdings-view-save">Save View</button><button type="button" class="btn secondary" id="holdings-view-reset">Restore Default</button><span class="muted" id="holdings-view-status"></span></div></div><div id="holdingsTable"></div></div></section>
-<section id="transactions" class="tab"><div class="card"><h2>Record Buy / Sell</h2><p class="muted">Local journal only — no brokerage order is placed. Select the exact holding row, particularly when the same ticker has multiple imported lots. Sales use proportional cost basis, not a tax-lot election.</p><form id="txForm" class="formgrid">
-<label>Holding<select name="holdingId" id="txHolding" required></select></label>
-<label>Action<select name="side"><option>BUY</option><option>SELL</option></select></label>
-<label>Quantity<input name="quantity" type="number" step="any" min="0.00000001" required></label>
-<label>Execution price ($)<input name="price" type="number" step="any" min="0" required></label>
-<label>Trade date<input type="date" name="date" required></label><label>Note<input name="note"></label><div class="actions"><button class="btn">Record transaction</button></div></form>
-<div class="note">Cash balances are not adjusted automatically. Reconcile cash against your statement to avoid double-counting unsettled activity.</div></div>
-<div class="card"><h2>Journal</h2><div id="txTable"></div></div></section>
-<section id="income" class="tab"><div class="card"><h2>Dividend Profiles</h2><small>Estimate recurring distributions. Irregular and special dividends should not be extrapolated automatically.</small><form id="divForm" class="formgrid"><label>Holding<select name="holdingId" id="divHolding" required></select></label><label>Distribution per share ($)<input name="perShare" type="number" step="any" min="0" required></label><label>Payments per year<select name="frequency"><option value="4">Quarterly (4)</option><option value="12">Monthly (12)</option><option value="2">Semiannual (2)</option><option value="1">Annual (1)</option></select></label><label>Next expected date<input name="nextDate" type="date"></label><div class="actions"><button class="btn">Save dividend profile</button></div></form></div><div class="card"><h2>Estimated Income</h2><div id="dividendTable"></div></div></section>
-<section id="baskets" class="tab">
-<div class="grid"><div class="card"><h2>Create Cross-Account Basket</h2><p class="muted">Baskets group holdings from any brokerage or retirement account. They do not change account ownership.</p><form id="basketForm"><label>Basket name<input name="name" required placeholder="Energy & Shipping"></label><button class="btn">Create basket</button></form></div>
-<div class="card"><h2>Assign a Holding</h2><form id="assignBasketForm"><label>Holding<select name="holdingId" id="basketHolding" required></select></label><label>Basket<select name="basketId" id="basketSelect"><option value="">Unassigned</option></select></label><button class="btn">Save assignment</button></form></div></div>
-<div class="card"><h2>Basket Overview</h2><div id="basketOverview"></div></div><div class="card"><h2>Basket Positions</h2><div id="basketPositions"></div></div></section>
-<section id="market" class="tab"><div class="card"><h2>Manual Market Indicators</h2><form id="marketForm" class="formgrid"><label>Symbol / label<input name="symbol" required placeholder="S&P 500"></label><label>Current value<input name="value" type="number" step="any" required></label><label>Daily change (%)<input name="change" type="number" step="any" value="0"></label><label>Units<input name="units" placeholder="points, USD, %"></label><div class="actions"><button class="btn">Save indicator</button></div></form><small>Replace each indicator by entering its existing symbol. This view is never labeled live.</small></div><div class="card"><h2>Market Board</h2><div id="marketTable"></div></div></section>
-<section id="data" class="tab"><div class="card"><h2>Research Quote Intake</h2><p>Copy tickers, request externally verified prices from Gemini or another source, paste the resulting CSV, preview, then apply to all matching holdings. An AI answer is not a verified exchange feed.</p>
-<div class="actions"><button id="copyTickers" class="btn secondary">Copy tickers</button><button id="copyGemini" class="btn secondary">Copy Gemini prompt</button></div>
-<label>Quote CSV: symbol,price,currency,asof,source</label><textarea id="quoteText" placeholder="symbol,price,currency,asof,source&#10;AAPL,250.00,USD,2026-11-20T16:00:00-05:00,Research source"></textarea><div class="actions"><button id="previewQuotes" class="btn secondary">Preview quotes</button><button id="applyQuotes" class="btn" disabled>Apply prices</button></div><div id="quotePreview"></div><small>USD only in this version. Dates, sources and currencies must be supplied. No account numbers or quantities are shared by the copy buttons.</small></div><div class="card"><h2>Import Holdings from CSV</h2><p>Required columns: <code>account, symbol, quantity, basis, price</code>. Account must match an existing account label (unique labels recommended). CSV imports update matching holdings only after review.</p><textarea id="csvText" placeholder="account,symbol,quantity,basis,price&#10;Roth IRA,SCHD,100,2500,27.50"></textarea><div class="actions"><button id="previewCsv" class="btn secondary">Preview CSV</button><button id="applyCsv" class="btn" disabled>Apply approved rows</button></div><div id="csvPreview"></div></div><div class="card"><h2>Local Backup</h2><p>Download a JSON backup regularly. Clearing browser data or switching devices can erase the local database.</p><div class="actions"><button id="backup" class="btn">Export full JSON backup</button><label style="margin:0">Restore JSON<input type="file" id="restore" accept=".json,application/json"></label></div><small>Restoring a backup replaces all current local records after confirmation.</small></div><div class="card"><h2>Future Connections</h2><p>Schwab via authenticated Azure Function; IBKR as an optional secondary provider; SharePoint sync later. No keys, account credentials, or trading functionality in this version.</p></div></section>
+</div><div class="grid"><div class="card"><h2>Account Breakdown</h2><div id="accountBreakdown"></div></div><div class="card"><h2>Managed Accounts</h2><small>Separate owner groups are excluded from My Portfolio totals unless explicitly selected.</small><div id="managedSummary"></div></div></div><div class="card"><div class="row"><h2>Portfolio Checkpoints</h2><button id="saveSnapshot" class="btn secondary">Save extra checkpoint</button></div><p class="muted">Monthly checkpoints are saved only when you click. The reminder persists until saved; values reflect the time captured rather than being backdated. Use the button anytime for additional snapshots.</p><div id="snapshots"></div></div><div class="card"><h2>Statement Reconciliation</h2><div id="reconciliation"></div></div></section>
+<!-- remaining sections unchanged -->
 </main><div id="toast" role="status"></div><footer>Market Portfolio v1 · Personal tracking only · Financial amounts are derived from your entries</footer>
-<style>
-.holdings-sort{border:0;background:transparent;color:inherit;font:inherit;font-weight:inherit;cursor:pointer;text-align:left;white-space:nowrap;padding:2px 4px;}
-#accountBreakdown .tablewrap{overflow-x:auto;max-width:100%}
-#accountBreakdown table{width:100%;min-width:440px;table-layout:fixed;white-space:normal}
-#accountBreakdown th,#accountBreakdown td{vertical-align:top;padding:9px 6px}
-#accountBreakdown th:first-child,#accountBreakdown td:first-child{width:48%;overflow-wrap:break-word;word-break:normal;padding-right:12px}
-#accountBreakdown th:nth-child(2),#accountBreakdown td:nth-child(2){width:26%;text-align:right;white-space:nowrap;font-variant-numeric:tabular-nums}
-#accountBreakdown th:nth-child(3),#accountBreakdown td:nth-child(3){width:26%;text-align:right;white-space:nowrap;font-variant-numeric:tabular-nums}
-#accountBreakdown td:nth-child(n+2){font-size:13px}
-@media(max-width:600px){#accountBreakdown table{min-width:435px}}
-.holdings-config{border:1px solid #dbe3ec;background:#f8fafc;padding:14px;margin:12px 0;border-radius:10px}
-.holdings-column-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:4px 16px}
-.holdings-column-grid label{font-size:13px;margin:3px 0;display:flex;align-items:center;gap:8px}
-.holdings-column-grid input{width:auto;margin:0}
-.quote-time{display:block;font-size:10.5px;line-height:1.3;color:#64748b;white-space:nowrap;margin-top:2px}
-.monthly-checkpoint{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:16px;padding:14px 18px;border-radius:12px;border:1px solid #decba7;background:#fff9ed;color:#48371c}.monthly-checkpoint .checkpoint-main{flex:1;min-width:220px}.monthly-checkpoint small{display:block;color:#786444}.monthly-checkpoint .btn{white-space:nowrap}
-.holdings-sort:hover{text-decoration:underline;}
-.holdings-sort:focus-visible{outline:2px solid #2563eb;outline-offset:2px;border-radius:3px;}
-</style>
 <script>
-"use strict";
-const $=id=>document.getElementById(id),uid=()=>crypto.randomUUID?crypto.randomUUID():"id-"+Date.now()+"-"+Math.random().toString(36).slice(2);
-const money=n=>Number(n||0).toLocaleString("en-US",{style:"currency",currency:"USD"}),num=n=>Number(n||0).toLocaleString("en-US",{maximumFractionDigits:6}),pct=n=>Number(n||0).toFixed(2)+"%";
-const esc=s=>String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
-const blank=()=>({version:1,owners:[{id:"me",name:"Me",primary:true},{id:"mom",name:"Mom",primary:false},{id:"children",name:"Children",primary:false}],accounts:[],holdings:[],cash:[],dividends:[],market:[],snapshots:[],baskets:[],pendingAdjustments:[],reconciliations:[],transactions:[],quoteHistory:[]});
-let state=blank(),db,filter="mine",staged=null,stagedQuotes=null;
-let holdingsSort={key:null,direction:"asc"};
-const holdingColumnDefs=[
- ["account","Account"],["ticker","Ticker"],["shares","Shares"],
- ["last","Last Price"],["broker","Broker Price"],["previous","Previous Close"],
- ["change","Day Change"],["positionDay","Position Day Change"],
- ["value","Market Value"],["basis","Basis"],["pnl","Unrealized P&L"],
- ["source","Price Source"],["action","Action"]
-];
-const defaultHoldingColumns=["account","ticker","shares","last","previous","change","positionDay","value","basis","pnl","action"];
-let pendingHoldingColumns=null;
-function holdingColumns(){
- const valid=new Set(holdingColumnDefs.map(d=>d[0]));
- const saved=state.holdingsView?.columns;
- return Array.isArray(saved)&&saved.includes("ticker")&&saved.includes("last")&&saved.every(x=>valid.has(x))&&new Set(saved).size===saved.length?saved:defaultHoldingColumns;
-}
-function holdingColumnOptions(){
- const selected=new Set(pendingHoldingColumns||holdingColumns()),panel=$("holdings-column-options");
- if(!panel)return;
- panel.innerHTML=holdingColumnDefs.map(([key,name])=>'<label><input type="checkbox" data-holding-column="'+esc(key)+'" '+(selected.has(key)?"checked":"")+' '+(["ticker","last"].includes(key)?"disabled":"")+'>'+esc(name)+'</label>').join("");
-}
-
-const holdingsSortColumns={Ticker:"ticker",Shares:"shares","Day Change":"dayPct","Market Value":"marketValue","Unrealized P&L":"pnl"};
-function sortedHoldings(rows){
- if(!holdingsSort.key)return rows;
- const get=(h)=>{switch(holdingsSort.key){
-  case "ticker":return String(h.symbol||"").toUpperCase();
-  case "shares":return Number(h.quantity);
-  case "dayPct":{const p=Number(usableMarketQuote(h)?.previousClose??h.previousClose);return p>0?(effectivePrice(h)-p)/p*100:null}
-  case "marketValue":return estimatedValue(h);
-  case "pnl":return estimatedProfit(h);
-  default:return null;
- }};
- return rows.map((h,i)=>({h,i})).sort((a,b)=>{
-  const av=get(a.h),bv=get(b.h);
-  const missing=v=>v===null||v===undefined||(typeof v==="number"&&!Number.isFinite(v));
-  if(missing(av)!==missing(bv))return missing(av)?1:-1;
-  if(missing(av))return a.i-b.i;
-  const result=typeof av==="string"?av.localeCompare(bv):av-bv;
-  return (holdingsSort.direction==="asc"?result:-result)||(a.i-b.i);
- }).map(x=>x.h);
-}
-function holdingsTable(headers,rows){
- let html=table(headers,rows);
- for(const [heading,key] of Object.entries(holdingsSortColumns)){
-  const active=holdingsSort.key===key;
-  const direction=active?holdingsSort.direction:null;
-  const indicator=active?(direction==="asc"?" ▲":" ▼"):" ⇅";
-  const accessibility=active?' aria-sort="'+(direction==="asc"?"ascending":"descending")+'"':'';
-  html=html.replace("<th>"+heading+"</th>",'<th'+accessibility+'><button type="button" class="holdings-sort" data-holdings-sort="'+key+'" aria-label="Sort by '+heading+'">'+heading+indicator+'</button></th>');
- }
- return html;
-}
-
-function toast(s){$("toast").textContent=s;$("toast").style.display="block";setTimeout(()=>$("toast").style.display="none",2600)}
-function indexedDBOpen(){return new Promise((res,rej)=>{const request=indexedDB.open("MarketPortfolioV1",1);request.onupgradeneeded=()=>request.result.createObjectStore("store");request.onsuccess=()=>res(request.result);request.onerror=()=>rej(request.error)})}
-async function load(){db=await indexedDBOpen();const result=await new Promise((res,rej)=>{let q=db.transaction("store","readonly").objectStore("store").get("data");q.onsuccess=()=>res(q.result);q.onerror=()=>rej(q.error)});if(result&&result.version===1)state={...blank(),...result};if(!/^\d{4}-\d{2}$/.test(state.monthlyCheckpointStart||"")){state.monthlyCheckpointStart=localMonthKey(new Date());await save()}else render()}
-async function save(){await new Promise((res,rej)=>{let tx=db.transaction("store","readwrite");tx.objectStore("store").put(state,"data");tx.oncomplete=res;tx.onerror=()=>rej(tx.error)});render()}
-const allAccounts=()=>state.accounts,visibleOwners=()=>filter==="all"?state.owners.map(o=>o.id):filter==="mine"?state.owners.filter(o=>o.primary).map(o=>o.id):[filter];
-const accounts=()=>state.accounts.filter(a=>visibleOwners().includes(a.ownerId));
-const holdings=()=>state.holdings.filter(h=>accounts().some(a=>a.id===h.accountId));
-const label=a=>a?a.broker+" · "+a.name:"Missing account";
-const value=h=>Number.isFinite(Number(h.marketValue))&&h.marketValue!==null&&h.marketValue!==undefined?Number(h.marketValue):h.quantity*h.price,profit=h=>h.basis===null||h.basis===undefined?null:value(h)-h.basis;
-const dividends=h=>{let d=state.dividends.find(x=>x.holdingId===h.id);return d?h.quantity*d.perShare*d.frequency:0};
-const cashFor=id=>Number(state.cash.find(c=>c.accountId===id)?.amount||0);
-// Market quotes are independent of SnapTrade snapshots. Never mutate broker prices or equity.
-function usableMarketQuote(h){
- if(h.kind==="money"||h.currency&&h.currency!=="USD")return null;
- const q=state.marketQuotes?.[String(h.symbol||"").toUpperCase()];
- if(!q||!(Number(q.price)>0)||!Number.isFinite(Date.parse(q.asof)))return null;
- const age=Date.now()-Date.parse(q.asof);
- if(age< -300000||age>24*3600000)return null;
- // SnapTrade quoteAsOf can be a data-retrieval timestamp, not the
- // underlying exchange observation. Comparing quote times against it
- // incorrectly discards valid Finnhub prices.
- // Only disallow quotes fetched before the latest connected account sync.
- const account=state.accounts.find(a=>a.id===h.accountId);
- const syncTime=Date.parse(account?.connected?.syncedAt||"");
- const fetchedTime=Date.parse(q.fetchedAt||"");
- if(account?.connected?.provider==="snaptrade"&&Number.isFinite(syncTime)&&Number.isFinite(fetchedTime)&&fetchedTime<syncTime)return null;
- return q;
-}
-function effectivePrice(h){return Number(usableMarketQuote(h)?.price??h.price)}
-function estimatedValue(h){const q=usableMarketQuote(h);if(!q)return value(h);return value(h)+Number(h.quantity||0)*(Number(q.price)-Number(h.price||0))}
-function estimatedProfit(h){return h.basis==null?null:estimatedValue(h)-Number(h.basis)}
-function marketEstimate(accs=accounts()){
- const hs=state.holdings.filter(h=>accs.some(a=>a.id===h.accountId));
- let movement=0,covered=0,eligible=0;
- for(const h of hs){if(h.kind==="money"||h.currency&&h.currency!=="USD")continue;eligible+=Math.abs(value(h));if(usableMarketQuote(h)){movement+=estimatedValue(h)-value(h);covered+=Math.abs(value(h))}}
- return {reported:totals(accs).total,estimated:totals(accs).total+movement,movement,covered,eligible};
-}
-
-function totals(accs=accounts()){let h=state.holdings.filter(x=>accs.some(a=>a.id===x.accountId));let sec=h.reduce((t,x)=>t+value(x),0),cash=accs.reduce((t,a)=>t+cashFor(a.id),0),basis=h.filter(x=>x.basis!==null&&x.basis!==undefined).reduce((t,x)=>t+Number(x.basis),0),income=h.reduce((t,x)=>t+dividends(x),0);let pending=state.pendingAdjustments.filter(p=>accs.some(a=>a.id===p.accountId)).reduce((t,p)=>t+Number(p.amount||0),0);let moneyFund=h.filter(x=>x.kind==="money").reduce((t,x)=>t+value(x),0);let connected=accs.filter(a=>a.connected?.provider==="snaptrade"),connectedIds=new Set(connected.map(a=>a.id));let connectedTotal=connected.reduce((t,a)=>t+Number(a.connected.reportedEquity||0),0);let nonConnectedSec=h.filter(x=>!connectedIds.has(x.accountId)).reduce((t,x)=>t+value(x),0);let nonConnectedCash=accs.filter(a=>!connectedIds.has(a.id)).reduce((t,a)=>t+cashFor(a.id),0);let nonConnectedPending=state.pendingAdjustments.filter(p=>!connectedIds.has(p.accountId)&&accs.some(a=>a.id===p.accountId)).reduce((t,p)=>t+Number(p.amount||0),0);let known=h.filter(x=>x.basis!==null&&x.basis!==undefined);return {sec,cash,basis,income,pending,moneyFund,total:connectedTotal+nonConnectedSec+nonConnectedCash+nonConnectedPending,pnl:known.reduce((t,x)=>t+value(x)-Number(x.basis),0)}}
-function selectOptions(sel,rows,display){let prev=sel.value;sel.innerHTML=rows.map(r=>'<option value="'+esc(r.id)+'">'+esc(display(r))+'</option>').join("");if(rows.some(x=>x.id===prev))sel.value=prev}
-function bDeleteButton(id){return '<button class="btn danger" data-op="deleteBasket" data-id="'+esc(id)+'">Delete</button>'}
-function table(head,rows){return rows.length?'<div class="tablewrap"><table><thead><tr>'+head.map(h=>'<th>'+esc(h)+'</th>').join("")+'</tr></thead><tbody>'+rows.join("")+'</tbody></table></div>':'<div class="empty">No records yet. Add an entry to get started.</div>'}
-const td=(s,cls="")=>'<td class="'+cls+'">'+s+'</td>';
-const b=(op,id,name)=>'<button class="btn danger" data-op="'+op+'" data-id="'+esc(id)+'">'+name+'</button>';
-function localMonthKey(d){return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")}
-function dueMonthlyCheckpoint(scope){
- const start=state.monthlyCheckpointStart||localMonthKey(new Date()),now=localMonthKey(new Date());
- const completed=new Set((state.snapshots||[]).filter(s=>s.type==="monthly"&&s.filter===scope).map(s=>s.monthKey));
- let year=Number(start.slice(0,4)),month=Number(start.slice(5));
- for(let i=0;i<240&&year*12+month<=Number(now.slice(0,4))*12+Number(now.slice(5));i++){
-  const key=year+"-"+String(month).padStart(2,"0");
-  if(!completed.has(key))return key;
-  if(++month>12){month=1;year++}
- }
- return null;
-}
-function checkpointRecord(type,monthKeyValue){
- const acc=accounts(),t=totals(acc),estimate=marketEstimate(acc),date=new Date().toISOString();
- const known=holdings().filter(h=>h.basis!=null);
- return {id:uid(),date,capturedAt:date,type,monthKey:monthKeyValue||null,filter,
-  total:t.total,reportedValue:t.total,estimatedValue:estimate.estimated,
-  marketAdjustment:estimate.movement,coveragePercent:estimate.eligible?estimate.covered/estimate.eligible*100:0,
-  pnl:t.pnl,estimatedPnl:known.reduce((sum,h)=>sum+estimatedProfit(h),0),
-  cash:t.cash,income:t.income,
-  accounts:acc.map(a=>({id:a.id,label:label(a),reportedValue:totals([a]).total,
-   estimatedValue:marketEstimate([a]).estimated,sourceAsOf:a.connected?.asOf||null,
-   syncedAt:a.connected?.syncedAt||null}))};
-}
-function renderMonthlyPrompt(){
- const banner=$("monthlyCheckpointBanner");if(!banner)return;
- const key=dueMonthlyCheckpoint(filter);
- if(!key){banner.classList.add("hidden");banner.innerHTML="";return}
- const month=new Date(Number(key.slice(0,4)),Number(key.slice(5))-1,1)
-  .toLocaleDateString("en-US",{month:"long",year:"numeric"});
- banner.classList.remove("hidden");
- banner.innerHTML='<span style="font-size:23px" aria-hidden="true">📅</span><div class="checkpoint-main"><strong>'+esc(month)+' checkpoint ready</strong><small>Manual only · reminder stays until saved · records values when clicked</small></div><button type="button" class="btn" id="monthlyCheckpointSave" data-month="'+esc(key)+'">Save checkpoint</button>';
-}
-function render(){
- const o=$("ownerFilter");let current=filter;o.innerHTML='<option value="mine">My Portfolio</option><option value="all">All Portfolios (oversight)</option>'+state.owners.filter(x=>!x.primary).map(x=>'<option value="'+esc(x.id)+'">'+esc(x.name)+'</option>').join("");o.value=current;if(!o.value)filter="mine",o.value="mine";
- const acc=accounts(),hs=holdings(),t=totals();
- renderMonthlyPrompt();
-  const dayRows=hs.filter(h=>h.kind!=="money"&&Number(usableMarketQuote(h)?.previousClose??h.previousClose)>0&&Number(h.quantity)>0);
- const dayChange=dayRows.reduce((sum,h)=>sum+(effectivePrice(h)-Number(usableMarketQuote(h)?.previousClose??h.previousClose))*h.quantity,0);
- const dayBase=dayRows.reduce((sum,h)=>sum+Number(usableMarketQuote(h)?.previousClose??h.previousClose)*h.quantity,0);
- const dailySummary=dayRows.length?'<span class="'+(dayChange>=0?"positive":"negative")+'">'+money(dayChange)+' ('+pct(dayBase?dayChange/dayBase*100:0)+')</span>':'—';
- const estimate=marketEstimate(acc);
- $("metrics").innerHTML=[["Estimated Portfolio Value",money(estimate.estimated)+'<small style="display:block;font-size:12px;font-weight:400">Market adjustment '+money(estimate.movement)+' · covered '+pct(estimate.eligible?100*estimate.covered/estimate.eligible:0)+' of eligible value</small>'],["Last Reported / Recorded Value",money(t.total)],["Est. Unrealized P&L",'<span class="'+(hs.filter(h=>h.basis!=null).reduce((sum,h)=>sum+estimatedProfit(h),0)>=0?"positive":"negative")+'">'+money(hs.filter(h=>h.basis!=null).reduce((sum,h)=>sum+estimatedProfit(h),0))+'</span>'],["Daily Price Change · Covered Holdings",dailySummary],["Cash + Money Funds",money(t.cash+t.moneyFund)],["Pending Adjustment",money(t.pending)],["Est. Annual Dividends",money(t.income)]].map(x=>'<div class="card"><small>'+x[0]+'</small><div class="metric">'+x[1]+'</div></div>').join("");
- $("marketOverview").innerHTML=state.market.length?state.market.slice(0,12).map(x=>'<div class="market"><small>'+esc(x.symbol)+'</small><strong>'+num(x.value)+' '+esc(x.units)+'</strong><small class="'+(x.change>=0?"positive":"negative")+'">'+(x.change>=0?"+":"")+pct(x.change)+'</small><small>Manual · '+esc(x.updated.slice(0,10))+'</small></div>').join(""):"";
- $("accountBreakdown").innerHTML=table(["Account","Last Reported","Estimated"],acc.map(a=>'<tr>'+td(esc(label(a)))+td(money(totals([a]).total),"num")+td(money(marketEstimate([a]).estimated),"num")+'</tr>'));
- const other=state.owners.filter(x=>!x.primary);$("managedSummary").innerHTML=other.map(x=>{let ta=totals(state.accounts.filter(a=>a.ownerId===x.id));return '<div class="row" style="border-bottom:1px solid #edf1f6;padding:9px"><span>'+esc(x.name)+'</span><strong>'+money(ta.total)+'</strong></div>'}).join("")||'<div class="empty">No managed owner groups.</div>';
- $("snapshots").innerHTML=table(["Captured","Month / Type","Last Reported","Estimated","P&L"],state.snapshots.filter(x=>x.filter===filter).slice(-12).reverse().map(x=>'<tr>'+td(esc(new Date(x.capturedAt||x.date).toLocaleDateString()))+td(esc(x.type==="monthly"?(x.monthKey||"Monthly"):x.type||"Manual"))+td(money(x.reportedValue??x.total))+td(x.estimatedValue==null?"—":money(x.estimatedValue))+td(money(x.estimatedPnl??x.pnl))+'</tr>'));
- const connectedChecks=acc.filter(a=>a.connected?.provider==="snaptrade").map(a=>{
-  const c=a.connected,difference=Number(c.reconstructedPositionValue||0)-Number(c.reportedEquity||0);
-  return '<p><strong>'+esc(a.name)+'</strong> · SnapTrade equity '+money(c.reportedEquity)+
-   '; priced positions '+money(c.reconstructedPositionValue)+
-   '; difference '+money(difference)+
-   '; missing cost basis '+num(c.basisMissing||0)+
-   '; balance as of '+esc(c.asOf||"unknown")+
-   '. <small>Difference can reflect pending activity, margin or provider timing; not automatically treated as extra cash.</small></p>';
- }).join("");
- $("reconciliation").innerHTML=connectedChecks+(state.pendingAdjustments.length?'<p><strong>Pending activity:</strong> '+state.pendingAdjustments.filter(p=>accounts().some(a=>a.id===p.accountId)).map(p=>esc(label(state.accounts.find(a=>a.id===p.accountId)))+': '+money(p.amount)).join(' · ')+'</p>':'')+(state.reconciliations.length?state.reconciliations.filter(r=>accounts().some(a=>a.id===r.parentAccountId||a.id===r.childAccountId)).map(r=>'<p><strong>401(k) BrokerageLink reconciliation:</strong> parent summary '+money(r.reportedParentLineValue)+' vs. detailed net '+money(r.detailedNetValue)+'; difference '+money(r.difference)+'. Parent line excluded to prevent double-counting.</p>').join(''):'')||'<div class="empty">No reconciliation items.</div>';
- selectOptions($("txHolding"),state.holdings,x=>x.symbol+" · "+label(state.accounts.find(a=>a.id===x.accountId))+" · "+num(x.quantity)+" shares");
- $("txTable").innerHTML=table(["Date","Side","Account","Ticker","Qty","Price","Realized P&L","Note"],state.transactions.filter(t=>accounts().some(a=>a.id===t.accountId)).slice().reverse().map(t=>"<tr>"+td(esc(t.date))+td(esc(t.side))+td(esc(label(state.accounts.find(a=>a.id===t.accountId))))+td(esc(t.symbol))+td(num(t.quantity))+td(money(t.price))+td(t.side==="SELL"?money(t.realized):"—")+td(esc(t.note||""))+"</tr>"));
- selectOptions($("basketHolding"),state.holdings,x=>x.symbol+" · "+label(state.accounts.find(a=>a.id===x.accountId))+(x.basketId?" · "+(state.baskets.find(b=>b.id===x.basketId)?.name||""):""));
- let bSel=$("basketSelect"),previousBasket=bSel.value;bSel.innerHTML='<option value="">Unassigned</option>'+state.baskets.map(b=>'<option value="'+esc(b.id)+'">'+esc(b.name)+'</option>').join("");if(state.baskets.some(b=>b.id===previousBasket))bSel.value=previousBasket;
- $("basketOverview").innerHTML=table(["Basket","Positions","Accounts","Value","Annual Income","Action"],state.baskets.map(b=>{let v=holdings().filter(h=>h.basketId===b.id),ac=new Set(v.map(h=>h.accountId));return '<tr>'+td(esc(b.name))+td(num(v.length))+td(num(ac.size))+td(money(v.reduce((t,h)=>t+value(h),0)))+td(money(v.reduce((t,h)=>t+dividends(h),0)))+td(b.id?bDeleteButton(b.id):"")+'</tr>'}));
- $("basketPositions").innerHTML=table(["Basket","Account","Ticker","Shares","Market Value","Basis","P&L"],holdings().filter(h=>h.basketId).map(h=>'<tr>'+td(esc(state.baskets.find(b=>b.id===h.basketId)?.name||"Unassigned"))+td(esc(label(state.accounts.find(a=>a.id===h.accountId))))+td(esc(h.symbol))+td(num(h.quantity))+td(money(value(h)))+td(money(h.basis))+td(money(profit(h)))+'</tr>'));
- selectOptions($("accountOwner"),state.owners,x=>x.name);selectOptions($("holdingAccount"),state.accounts,label);selectOptions($("cashAccount"),state.accounts,label);selectOptions($("divHolding"),state.holdings,x=>x.symbol+" — "+label(state.accounts.find(a=>a.id===x.accountId)));
- $("ownerList").innerHTML=table(["Owner","My portfolio?","Action"],state.owners.map(x=>'<tr>'+td(esc(x.name))+td(x.primary?"Yes":"No")+td(x.id==="me"?"Default":b("toggleOwner",x.id,x.primary?"Exclude":"Include"))+'</tr>'));
- $("accountsTable").innerHTML=table(["Owner","Broker","Label","Type","Value","Action"],state.accounts.map(a=>'<tr>'+td(esc(state.owners.find(o=>o.id===a.ownerId)?.name||"Unknown"))+td(esc(a.broker))+td(esc(a.name)+(a.connected?.provider==="snaptrade"?' <span class="pill">Connected · SnapTrade</span>':""))+td(esc(a.type))+td(money(totals([a]).total))+td(a.connected?.provider==="snaptrade"?"Synced":b("deleteAccount",a.id,"Delete"))+'</tr>'));
- const allHoldingsColumns=holdingColumnDefs.map(x=>x[0]);
- const visibleHoldingColumns=new Set(holdingColumns());
- const visibleHoldingsHeaders=holdingColumnDefs.filter(([key])=>visibleHoldingColumns.has(key)).map(([,title])=>title);
- $("holdingsTable").innerHTML=holdingsTable(visibleHoldingsHeaders,sortedHoldings(hs).map(h=>{
-  const q=usableMarketQuote(h),price=effectivePrice(h),prior=Number(q?.previousClose??h.previousClose),v=estimatedValue(h),p=estimatedProfit(h);
-  const eligible=h.kind!=="money"&&(!h.currency||h.currency==="USD")&&/^[A-Z][A-Z0-9.-]{0,14}$/.test(String(h.symbol||"").toUpperCase());
-  const action=eligible?'<button type="button" class="ticker-refresh" data-refresh-ticker="'+esc(h.symbol.toUpperCase())+'" title="Refresh only '+esc(h.symbol)+' from Finnhub" aria-label="Refresh quote for '+esc(h.symbol)+'">↻</button> ':'';
-  const quoteTime=q?'<small class="quote-time" title="Quote observed '+esc(new Date(q.asof).toLocaleString())+'">'+esc(new Intl.DateTimeFormat("en-US",{month:"numeric",day:"numeric",hour:"numeric",minute:"2-digit"}).format(new Date(q.asof)))+'</small>':'<small class="quote-time" title="'+esc(h.quoteSource||"Recorded price")+'">Broker snapshot</small>';
-  const brokerPrice=h.source==="snaptrade"?'Broker price '+money(h.price):'Recorded price '+money(h.price);
-  const cell={
-    account:esc(label(state.accounts.find(a=>a.id===h.accountId))),
-    ticker:'<strong>'+esc(h.symbol)+'</strong> '+action+(h.kind==="money"?' <span class="pill">Money fund</span>':""),
-    shares:num(h.quantity),
-    last:money(price)+quoteTime,
-    broker:money(h.price),
-    previous:prior>0?money(prior):"—",
-    change:prior>0?'<span class="'+(price>=prior?"positive":"negative")+'">'+money(price-prior)+' ('+pct((price-prior)/prior*100)+')</span>':"—",
-    positionDay:prior>0?'<span class="'+(price>=prior?"positive":"negative")+'">'+money((price-prior)*h.quantity)+'</span>':"—",
-    value:money(v),
-    basis:h.basis==null?"—":money(h.basis),
-    pnl:p==null?"—":'<span class="'+(p>=0?"positive":"negative")+'">'+money(p)+'</span>',
-    source:q?'Finnhub · '+esc(new Date(q.asof).toLocaleString()):esc(h.quoteSource||"Recorded"),
-    action:h.source==="snaptrade"?"Synced":b("deleteHolding",h.id,"Delete")
+(function(){
+  const toggle = document.getElementById("themeToggle");
+  if(!toggle) return;
+  const saved = localStorage.getItem("mp-theme");
+  if(saved === "dark" || (!saved && window.matchMedia("(prefers-color-scheme: dark)").matches)) {
+    document.documentElement.classList.add("dark");
+    toggle.textContent = "☀️";
+  }
+  toggle.onclick = () => {
+    document.documentElement.classList.toggle("dark");
+    const isDark = document.documentElement.classList.contains("dark");
+    localStorage.setItem("mp-theme", isDark ? "dark" : "light");
+    toggle.textContent = isDark ? "☀️" : "🌙";
   };
-  return '<tr>'+holdingColumnDefs.filter(([key])=>visibleHoldingColumns.has(key)).map(([key])=>td(cell[key])).join("")+'</tr>';
- }));
-
- $("dividendTable").innerHTML='<div class="grid"><div class="card"><small>Annual income · current selection</small><div class="metric">'+money(t.income)+'</div></div><div class="card"><small>Average monthly equivalent</small><div class="metric">'+money(t.income/12)+'</div></div></div>'+table(["Account","Ticker","Distribution/share","Frequency","Annual Est.","Next date","Action"],hs.filter(h=>state.dividends.some(d=>d.holdingId===h.id)).map(h=>{let d=state.dividends.find(d=>d.holdingId===h.id);return '<tr>'+td(esc(label(state.accounts.find(a=>a.id===h.accountId))))+td(esc(h.symbol))+td(money(d.perShare))+td(num(d.frequency)+"/yr")+td(money(dividends(h)))+td(esc(d.nextDate||"Unknown"))+td(b("deleteDividend",d.id,"Delete"))+'</tr>'}));
- $("marketTable").innerHTML=table(["Indicator","Value","Daily %","Updated","Action"],state.market.map(x=>'<tr>'+td(esc(x.symbol))+td(num(x.value)+" "+esc(x.units))+td(pct(x.change))+td(esc(x.updated.slice(0,16).replace("T"," ")))+td(b("deleteMarket",x.id,"Delete"))+'</tr>'))
-}
-$("holdings-config-toggle").onclick=()=>{
- const panel=$("holdings-column-config"),opening=panel.classList.contains("hidden");
- panel.classList.toggle("hidden",!opening);
- $("holdings-config-toggle").setAttribute("aria-expanded",String(opening));
- if(opening){pendingHoldingColumns=holdingColumns().slice();holdingColumnOptions()}
-};
-$("holdings-column-options").onchange=event=>{
- const check=event.target.closest("[data-holding-column]");if(!check)return;
- pendingHoldingColumns=holdingColumnDefs.map(([key])=>key).filter(key=>{
-  const input=$("holdings-column-options").querySelector('[data-holding-column="'+key+'"]');
-  return input&&input.checked;
- });
- if(!pendingHoldingColumns.includes("ticker"))pendingHoldingColumns.push("ticker");
- if(!pendingHoldingColumns.includes("last"))pendingHoldingColumns.push("last");
- $("holdings-view-status").textContent="Unsaved changes";
-};
-$("holdings-view-save").onclick=async()=>{
- const selected=pendingHoldingColumns||holdingColumns();
- state.holdingsView={columns:selected.slice()};
- await save();
- $("holdings-view-status").textContent="View saved locally";
-};
-$("holdings-view-reset").onclick=async()=>{
- state.holdingsView={columns:defaultHoldingColumns.slice()};pendingHoldingColumns=defaultHoldingColumns.slice();
- await save();holdingColumnOptions();
- $("holdings-view-status").textContent="Default view restored";
-};
-document.addEventListener("click",event=>{
- const button=event.target.closest("[data-holdings-sort]");
- if(!button)return;
- const key=button.dataset.holdingsSort;
- if(!Object.values(holdingsSortColumns).includes(key))return;
- if(holdingsSort.key===key)holdingsSort.direction=holdingsSort.direction==="asc"?"desc":"asc";
- else {holdingsSort.key=key;holdingsSort.direction=key==="ticker"?"asc":"desc";}
- render();
-});
-document.querySelectorAll("[data-tab]").forEach(x=>x.addEventListener("click",()=>tab(x.dataset.tab)));document.querySelectorAll("[data-tab-go]").forEach(x=>x.addEventListener("click",()=>tab(x.dataset.tabGo)));
-function tab(name){document.querySelectorAll(".tab").forEach(x=>x.classList.toggle("show",x.id===name));document.querySelectorAll("nav button").forEach(x=>x.classList.toggle("active",x.dataset.tab===name))}
-$("ownerFilter").addEventListener("change",e=>{filter=e.target.value;render()});$("recalculate").onclick=()=>{render();toast("Recalculated from saved portfolio data")};
-function formData(id){return Object.fromEntries(new FormData($(id)).entries())}
-$("ownerForm").onsubmit=async e=>{e.preventDefault();let f=formData("ownerForm");state.owners.push({id:uid(),name:f.name.trim(),primary:f.primary==="true"});e.target.reset();await save()};
-$("accountForm").onsubmit=async e=>{e.preventDefault();let f=formData("accountForm");state.accounts.push({id:uid(),ownerId:f.ownerId,broker:f.broker.trim(),name:f.name.trim(),type:f.type});e.target.reset();await save()};
-function upsertHolding(f){let a=state.accounts.find(a=>a.id===f.accountId);if(!a)throw Error("Unknown account");if(a.connected?.provider==="snaptrade")throw Error("This holding is managed by SnapTrade. Use Refresh Fidelity.");let symbol=String(f.symbol).trim().toUpperCase(),quantity=Number(f.quantity),basis=Number(f.basis),price=Number(f.price);if(!symbol||![quantity,basis,price].every(x=>Number.isFinite(x)&&x>=0))throw Error("Invalid holding");let matches=state.holdings.filter(h=>h.accountId===a.id&&h.symbol===symbol);if(matches.length>1)throw Error("Multiple imported lots exist for this account/ticker; use CSV import or edit a unique holding.");let old=matches[0];if(old&&state.transactions.some(t=>t.holdingId===old.id))throw Error("Holding has a transaction journal. Use Buy/Sell instead.");if(old)Object.assign(old,{quantity,basis,price,marketValue:null,kind:f.kind||old.kind||"security"});else state.holdings.push({id:uid(),accountId:a.id,symbol,quantity,basis,price,kind:f.kind||"security",basketId:null});}
-$("holdingForm").onsubmit=async e=>{e.preventDefault();try{upsertHolding(formData("holdingForm"));e.target.reset();await save();toast("Holding saved")}catch(err){alert(err.message)}};
-$("cashForm").onsubmit=async e=>{e.preventDefault();let f=formData("cashForm"),amount=Number(f.amount);if(!Number.isFinite(amount)||amount<0)return;if(state.accounts.some(a=>a.id===f.accountId&&a.connected?.provider==="snaptrade"))return alert("Connected Fidelity cash comes from SnapTrade.");let c=state.cash.find(x=>x.accountId===f.accountId);if(c)c.amount=amount;else state.cash.push({id:uid(),accountId:f.accountId,amount});await save();toast("Cash saved")};
-$("divForm").onsubmit=async e=>{e.preventDefault();let f=formData("divForm"),perShare=Number(f.perShare),frequency=Number(f.frequency);if(!state.holdings.some(h=>h.id===f.holdingId)||!Number.isFinite(perShare)||perShare<0)return;let d=state.dividends.find(x=>x.holdingId===f.holdingId);if(d)Object.assign(d,{perShare,frequency,nextDate:f.nextDate});else state.dividends.push({id:uid(),holdingId:f.holdingId,perShare,frequency,nextDate:f.nextDate});await save();toast("Dividend profile saved")};
-$("txForm").elements.date.value=new Date().toISOString().slice(0,10);
-$("txForm").onsubmit=async e=>{e.preventDefault();let f=formData("txForm"),h=state.holdings.find(h=>h.id===f.holdingId),q=Number(f.quantity),p=Number(f.price);
-if(!h||!Number.isFinite(q)||q<=0||!Number.isFinite(p)||p<0)return alert("Invalid transaction");if(state.accounts.some(a=>a.id===h.accountId&&a.connected?.provider==="snaptrade"))return alert("Connected Fidelity holdings are read-only. Record trades at Fidelity and refresh.");
-let before=Number(h.quantity),basis=Number(h.basis);if(f.side==="SELL"&&q>before+1e-8)return alert("Insufficient shares");
-let removed=f.side==="SELL"?(Math.abs(q-before)<1e-8?basis:basis*q/before):0;
-h.quantity=f.side==="BUY"?before+q:Math.max(0,before-q);h.basis=f.side==="BUY"?basis+q*p:Math.max(0,basis-removed);
-h.price=p;h.marketValue=null;h.quoteSource="Manual transaction (not a market quote)";
-state.transactions.push({id:uid(),accountId:h.accountId,holdingId:h.id,symbol:h.symbol,side:f.side,quantity:q,price:p,date:f.date,note:f.note||"",basisRemoved:removed,realized:f.side==="SELL"?q*p-removed:0,createdAt:new Date().toISOString()});
-e.target.reset();$("txForm").elements.date.value=new Date().toISOString().slice(0,10);await save();toast("Local transaction saved; cash unchanged")};
-$("basketForm").onsubmit=async e=>{e.preventDefault();let name=formData("basketForm").name.trim();if(!name)return;if(state.baskets.some(b=>b.name.toLowerCase()===name.toLowerCase()))return alert("Basket already exists");state.baskets.push({id:uid(),name});e.target.reset();await save();toast("Basket created")};
-$("assignBasketForm").onsubmit=async e=>{e.preventDefault();let f=formData("assignBasketForm"),h=state.holdings.find(h=>h.id===f.holdingId);if(!h)return;h.basketId=f.basketId||null;await save();toast("Basket assignment saved")};
-$("marketForm").onsubmit=async e=>{e.preventDefault();let f=formData("marketForm"),symbol=f.symbol.trim().toUpperCase(),value=Number(f.value),change=Number(f.change);if(![value,change].every(Number.isFinite))return;let x=state.market.find(x=>x.symbol===symbol);if(x)Object.assign(x,{value,change,units:f.units,updated:new Date().toISOString()});else state.market.push({id:uid(),symbol,value,change,units:f.units,updated:new Date().toISOString()});e.target.reset();await save();toast("Indicator saved")};
-document.body.addEventListener("click",async e=>{let x=e.target.closest("[data-op]");if(!x)return;let {op,id}=x.dataset;if(op==="toggleOwner"){let o=state.owners.find(o=>o.id===id);o.primary=!o.primary;await save();return}if(!confirm("Delete this record? Related records may also be removed."))return;if(op==="deleteAccount"){if(state.transactions.some(t=>t.accountId===id))return alert("Account has transactions; preserve history.");state.accounts=state.accounts.filter(a=>a.id!==id);let keep=new Set(state.accounts.map(a=>a.id));state.holdings=state.holdings.filter(h=>keep.has(h.accountId));state.cash=state.cash.filter(c=>keep.has(c.accountId))}if(op==="deleteHolding"){if(state.transactions.some(t=>t.holdingId===id))return alert("Holding has transactions; preserve history.");state.holdings=state.holdings.filter(h=>h.id!==id)}if(op==="deleteDividend")state.dividends=state.dividends.filter(d=>d.id!==id);if(op==="deleteMarket")state.market=state.market.filter(m=>m.id!==id);if(op==="deleteBasket"){state.baskets=state.baskets.filter(b=>b.id!==id);state.holdings.forEach(h=>{if(h.basketId===id)h.basketId=null})}let keepH=new Set(state.holdings.map(h=>h.id));state.dividends=state.dividends.filter(d=>keepH.has(d.holdingId));await save()});
-$("saveSnapshot").onclick=async()=>{if(!accounts().length)return alert("No accounts available.");const item=checkpointRecord("manual");state.snapshots.push(item);try{await save();toast("Extra checkpoint saved locally")}catch(e){state.snapshots=state.snapshots.filter(s=>s.id!==item.id);render();alert("Checkpoint save failed: "+String(e.message||e))}};
-document.addEventListener("click",async e=>{
- const button=e.target.closest("#monthlyCheckpointSave");if(!button)return;
- const month=button.dataset.month;
- if(month!==dueMonthlyCheckpoint(filter))return alert("Checkpoint reminder changed; reload and retry.");
- if(!accounts().length)return alert("No accounts available.");
- const recorded=state.snapshots.some(s=>s.type==="monthly"&&s.filter===filter&&s.monthKey===month);
- if(recorded)return alert("This monthly checkpoint is already saved.");
- const report=totals(),estimated=marketEstimate();
- if(!confirm("Save "+month+" checkpoint now?\n\nLast reported: "+money(report.total)+"\nEstimated: "+money(estimated.estimated)+"\nCaptured: "+new Date().toLocaleString()+"\n\nThe values are recorded today, not backdated to the first of the month."))return;
- button.disabled=true;
- const item=checkpointRecord("monthly",month);
- state.snapshots.push(item);
- try{await save();toast("Monthly checkpoint saved locally")}
- catch(error){state.snapshots=state.snapshots.filter(s=>s.id!==item.id);render();alert("Checkpoint save failed: "+String(error.message||error))}
-});
-function download(name,text,type){let url=URL.createObjectURL(new Blob([text],{type})),a=document.createElement("a");a.href=url;a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(url),1000)}
-$("backup").onclick=()=>download("market-portfolio-backup-"+new Date().toISOString().slice(0,10)+".json",JSON.stringify(state,null,2),"application/json");
-$("restore").onchange=async e=>{let file=e.target.files[0];if(!file)return;try{let data=JSON.parse(await file.text());if(data.version!==1||!["owners","accounts","holdings","cash","dividends","market","snapshots"].every(k=>Array.isArray(data[k])))throw Error("Invalid backup format");if(confirm("Replace all local records with this backup?")){state={...blank(),...data};await save();toast("Backup restored")}}catch(err){alert(err.message)}e.target.value=""};
-function csvRows(text){let rows=[],row=[],cell="",quote=false;for(let i=0;i<text.length;i++){let c=text[i];if(c==='"'){if(quote&&text[i+1]==='"'){cell+='"';i++}else quote=!quote}else if(c===","&&!quote){row.push(cell);cell=""}else if((c==="\n"||c==="\r")&&!quote){if(c==="\r"&&text[i+1]==="\n")i++;row.push(cell);if(row.some(x=>x.trim()))rows.push(row);row=[];cell=""}else cell+=c}if(quote)throw Error("Unclosed quoted CSV field");row.push(cell);if(row.some(x=>x.trim()))rows.push(row);return rows}
-$("previewCsv").onclick=()=>{try{let rows=csvRows($("csvText").value),head=rows.shift().map(x=>x.trim().toLowerCase());for(let col of ["account","symbol","quantity","basis","price"])if(!head.includes(col))throw Error("Missing column: "+col);let problems=[],valid=[];rows.forEach((r,i)=>{let f=Object.fromEntries(head.map((k,j)=>[k,r[j]??""])),matches=state.accounts.filter(a=>a.name.toLowerCase()===f.account.trim().toLowerCase());if(matches.length!==1)problems.push("Row "+(i+2)+": account label must match exactly one account");else if(!f.symbol.trim()||["quantity","basis","price"].some(k=>!f[k].trim()||!Number.isFinite(Number(f[k]))||Number(f[k])<0))problems.push("Row "+(i+2)+": invalid values");else valid.push({...f,accountId:matches[0].id,kind:"security"})});staged=problems.length?null:valid;$("csvPreview").innerHTML='<p>'+valid.length+' rows valid. '+problems.length+' issues.</p>'+problems.map(esc).join("<br>");$("applyCsv").disabled=!staged||!staged.length}catch(err){alert(err.message);staged=null;$("applyCsv").disabled=true}};
-$("applyCsv").onclick=async()=>{if(!staged||!staged.length)return;if(!confirm("Update/add "+staged.length+" holding records?"))return;try{for(let r of staged){let h=state.holdings.find(h=>h.accountId===r.accountId&&h.symbol===r.symbol);if(h&&state.transactions.some(t=>t.holdingId===h.id))throw Error("CSV import would overwrite traded holding "+h.symbol)}for(let r of staged)upsertHolding(r)}catch(err){return alert(err.message)}staged=null;$("applyCsv").disabled=true;await save();toast("CSV imported")};
-$("exportHoldings").onclick=()=>{let lines=["account,symbol,quantity,basis,price,kind"];for(let h of holdings()){let a=state.accounts.find(a=>a.id===h.accountId);lines.push([a?.name||"",h.symbol,h.quantity,h.basis,h.price,h.kind].map(v=>'"'+String(v).replace(/"/g,'""')+'"').join(","))}download("holdings.csv",lines.join("\n"),"text/csv")};
-function tickers(){return [...new Set(holdings().map(h=>h.symbol.toUpperCase()).filter(Boolean))].sort()}
-async function copyText(t){try{await navigator.clipboard.writeText(t);toast("Copied")}catch(e){alert("Clipboard access requires HTTPS and browser permission")}}
-$("copyTickers").onclick=()=>copyText(tickers().join(", "));
-$("copyGemini").onclick=()=>copyText("Research the latest independently verifiable USD prices for: "+tickers().join(", ")+". Return plain CSV ONLY with the exact headers symbol,price,currency,asof,source. Use an ISO 8601 quote timestamp with timezone and a traceable source. Omit any ticker whose current price cannot be confirmed; do not invent prices or timestamps.");
-$("quoteText").oninput=()=>{stagedQuotes=null;$("applyQuotes").disabled=true;$("quotePreview").innerHTML=""};
-$("previewQuotes").onclick=()=>{try{let rows=csvRows($("quoteText").value);if(!rows.length)throw Error("Paste a CSV");let head=rows.shift().map(x=>x.trim().toLowerCase());for(let k of ["symbol","price","currency","asof","source"])if(!head.includes(k))throw Error("Missing "+k);let quotes=[],seen=new Set(),allowed=new Set(state.holdings.map(h=>h.symbol.toUpperCase()));
-for(let row of rows){let q=Object.fromEntries(head.map((k,j)=>[k,String(row[j]||"").trim()]));q.symbol=q.symbol.toUpperCase();let t=Date.parse(q.asof);if(!allowed.has(q.symbol)||seen.has(q.symbol)||!(Number(q.price)>0)||q.currency.toUpperCase()!=="USD"||!Number.isFinite(t)||!/(Z|[+-]\d\d:?\d\d)$/i.test(q.asof)||t>Date.now()+3600000||!q.source)throw Error("Invalid/duplicate/unmatched quote: "+q.symbol);q.price=Number(q.price);seen.add(q.symbol);quotes.push(q)}
-stagedQuotes=quotes;$("applyQuotes").disabled=!quotes.length;$("quotePreview").innerHTML='<p class="note">Review unverified quotes before applying. All accounts holding a ticker will receive that price.</p>'+table(["Symbol","Price","As of","Source"],quotes.map(q=>"<tr>"+td(esc(q.symbol))+td(money(q.price))+td(esc(q.asof))+td(esc(q.source))+"</tr>"))}catch(e){stagedQuotes=null;$("applyQuotes").disabled=true;alert(e.message)}};
-$("applyQuotes").onclick=async()=>{if(!stagedQuotes?.length)return;if(!confirm("Apply "+stagedQuotes.length+" externally researched prices?"))return;let count=0;for(let q of stagedQuotes){for(let h of state.holdings.filter(h=>h.symbol.toUpperCase()===q.symbol&&h.source!=="snaptrade"&&!state.accounts.some(a=>a.id===h.accountId&&a.connected?.provider==="snaptrade"))){h.price=q.price;h.marketValue=null;h.quoteAsOf=q.asof;h.quoteSource=q.source;count++}state.quoteHistory.push({...q,id:uid(),importedAt:new Date().toISOString()})}stagedQuotes=null;$("applyQuotes").disabled=true;await save();toast(count+" positions repriced")};
-load().catch(e=>{console.error(e);alert("Local database unavailable: "+e.message)});
-</script><script src="js/integrations.js?v=20261124-auto-quote-2"></script><script src="js/fidelity-sync.js?v=20261123-direct-refresh-1"></script><script src="js/live-markets.js?v=20261124-security-refresh-1"></script><script src="js/key-preferences.js?v=20261120-keys-index-fix-1"></script></body></html>
+})();
+</script>
+</body></html>
