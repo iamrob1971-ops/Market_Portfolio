@@ -313,6 +313,7 @@ function renderMonthlyPrompt(){
 }
 function renderDashboardCheckpointTrend(){
  const host=$("dashboardCheckpointTrend");if(!host)return;
+ if(state.dashboardPrivacyHidden){host.innerHTML='<span class="trend-caption">Checkpoint values hidden · ****</span>';return}
  const points=(state.snapshots||[]).filter(x=>x.filter===filter&&Number.isFinite(Number(x.estimatedValue??x.total))&&Date.parse(x.capturedAt||x.date))
   .slice().sort((a,b)=>Date.parse(a.capturedAt||a.date)-Date.parse(b.capturedAt||b.date)).slice(-24);
  if(points.length<2){host.innerHTML='<span class="trend-caption">Checkpoint history chart appears after two saved observations.</span>';return}
@@ -355,6 +356,15 @@ function renderDashboardHoldings(){
  const rows=[...host.querySelectorAll("tbody tr")],matches=rows.filter(r=>r.textContent.toLowerCase().includes(query));
  const cap=dashboardHoldingsExpanded?Infinity:12;let shown=0;
  rows.forEach(row=>{const keep=matches.includes(row)&&shown<cap;row.hidden=!keep;if(keep)shown++});
+ const visibleIds=new Set(matches.map(r=>r.dataset.holdingId));
+ const matchedHoldings=holdings().filter(h=>visibleIds.has(h.id));
+ const totalDay=matchedHoldings.reduce((sum,h)=>{const prior=Number(usableMarketQuote(h)?.previousClose??h.previousClose);return prior>0&&h.kind!=="money"?sum+(effectivePrice(h)-prior)*Number(h.quantity||0):sum},0);
+ const totalValue=matchedHoldings.reduce((sum,h)=>sum+estimatedValue(h),0);
+ const pnlHoldings=matchedHoldings.filter(h=>h.basis!=null);
+ const totalPnl=pnlHoldings.reduce((sum,h)=>sum+estimatedProfit(h),0);
+ const columns=holdingColumnDefs.filter(([key])=>holdingColumns().includes(key));
+ const content={account:"TOTAL",ticker:"TOTAL",positionDay:money(totalDay),value:money(totalValue),pnl:pnlHoldings.length?money(totalPnl):"—"};
+ const tableEl=host.querySelector("table");if(tableEl&&matches.length){const foot=document.createElement("tfoot");const tr=document.createElement("tr");for(const [key] of columns){const tdEl=document.createElement("td");tdEl.textContent=content[key]||"";tr.append(tdEl)}foot.append(tr);tableEl.append(foot)}
  if(counter)counter.textContent=matches.length+" matching holdings"+(!dashboardHoldingsExpanded&&matches.length>12?" · showing first 12":"");
  if(more){more.classList.toggle("hidden",matches.length<=12);more.textContent=dashboardHoldingsExpanded?"Show fewer":"Show all "+matches.length}
 }
@@ -366,6 +376,9 @@ function render(){
  renderDashboardMarketStrip();
  renderDashboardCheckpointTrend();
  $("dashboard").classList.toggle("dashboard-dark",state.dashboardTheme==="dark");
+ $("dashboard").classList.toggle("dashboard-private",!!state.dashboardPrivacyHidden);
+ $("dashboardPrivacyToggle").textContent=state.dashboardPrivacyHidden?"◉ Show balances":"◉ Hide balances";
+ $("dashboardPrivacyToggle").setAttribute("aria-pressed",String(!!state.dashboardPrivacyHidden));
  $("dashboardThemeLabel").textContent=state.dashboardTheme==="dark"?"Light mode":"Dark mode";
   const dayRows=hs.filter(h=>h.kind!=="money"&&Number(usableMarketQuote(h)?.previousClose??h.previousClose)>0&&Number(h.quantity)>0);
  const dayChange=dayRows.reduce((sum,h)=>sum+(effectivePrice(h)-Number(usableMarketQuote(h)?.previousClose??h.previousClose))*h.quantity,0);
@@ -374,8 +387,8 @@ function render(){
  const estimate=marketEstimate(acc);
  const estimatedPnl=hs.filter(h=>h.basis!=null).reduce((sum,h)=>sum+estimatedProfit(h),0);
  const estimateChange=estimate.estimated-t.total,coverage=estimate.eligible?100*estimate.covered/estimate.eligible:0;
- $("dashboardHeadlineValue").textContent=money(estimate.estimated);
- $("dashboardHeadlineMove").innerHTML='<span class="'+(estimateChange>=0?"positive":"negative")+'">'+(estimateChange>=0?"+":"")+money(estimateChange)+'</span> market adjustment <small style="font-weight:400;color:var(--dash-sub)"> · '+pct(coverage)+' quote coverage</small>';
+ $("dashboardHeadlineValue").textContent=state.dashboardPrivacyHidden?"****":money(estimate.estimated);
+ $("dashboardHeadlineMove").innerHTML=state.dashboardPrivacyHidden?"****":'<span class="'+(estimateChange>=0?"positive":"negative")+'">'+(estimateChange>=0?"+":"")+money(estimateChange)+'</span> market adjustment <small style="font-weight:400;color:var(--dash-sub)"> · '+pct(coverage)+' quote coverage</small>';
  const metricItems=[
   ["Last Reported",money(t.total)],
   ["Est. Unrealized P&L",'<span class="'+(estimatedPnl>=0?"positive":"negative")+'">'+money(estimatedPnl)+'</span>'],
@@ -384,7 +397,7 @@ function render(){
   ["Annual Dividends",money(t.income)],
   ["Pending Adjustment",money(t.pending)]
  ];
- $("metrics").innerHTML=metricItems.map(([name,value])=>'<div class="dashboard-kpi"><small>'+esc(name)+'</small><div class="metric">'+value+'</div></div>').join("");
+ $("metrics").innerHTML=metricItems.map(([name,value])=>'<div class="dashboard-kpi"><small>'+esc(name)+'</small><div class="metric">'+(state.dashboardPrivacyHidden?"****":value)+'</div></div>').join("");
  $("marketOverview").innerHTML=state.market.length?state.market.slice(0,12).map(x=>'<div class="market"><small>'+esc(x.symbol)+'</small><strong>'+num(x.value)+' '+esc(x.units)+'</strong><small class="'+(x.change>=0?"positive":"negative")+'">'+(x.change>=0?"+":"")+pct(x.change)+'</small><small>Manual · '+esc(x.updated.slice(0,10))+'</small></div>').join(""):"";
  $("accountBreakdown").innerHTML=table(["Account","Last Reported","Estimated"],acc.map(a=>'<tr>'+td(esc(label(a)))+td(money(totals([a]).total),"num")+td(money(marketEstimate([a]).estimated),"num")+'</tr>'));
  const other=state.owners.filter(x=>!x.primary);$("managedSummary").innerHTML=other.map(x=>{let ta=totals(state.accounts.filter(a=>a.ownerId===x.id));return '<div class="row" style="border-bottom:1px solid #edf1f6;padding:9px"><span>'+esc(x.name)+'</span><strong>'+money(ta.total)+'</strong></div>'}).join("")||'<div class="empty">No managed owner groups.</div>';
@@ -519,6 +532,21 @@ document.addEventListener("click",e=>{
   const pop=$("checkpointMenu"),b=$("checkpointMenuToggle");
   if(pop){pop.classList.add("hidden");b?.setAttribute("aria-expanded","false")}
  }
+});
+$("dashboardPrivacyToggle").onclick=async()=>{
+ const old=!!state.dashboardPrivacyHidden;state.dashboardPrivacyHidden=!old;
+ try{await save()}catch(e){state.dashboardPrivacyHidden=old;render();alert("Unable to save privacy preference: "+String(e.message||e))}
+};
+document.addEventListener("click",async e=>{
+ const btn=e.target.closest("[data-refresh-market]");if(!btn)return;
+ const id=btn.dataset.refreshMarket;btn.disabled=true;
+ try{
+  const run=id.startsWith("^")?window.marketIndexRefresh:window.marketSpotRefresh;
+  if(typeof run!=="function"){toast("Market refresh is not available.");return}
+  const result=await run(id);
+  if(result?.error)toast(result.error);
+ }catch(err){toast("Refresh failed: "+String(err.message||err))}
+ finally{btn.disabled=false}
 });
 $("dashboardThemeToggle").onclick=async()=>{
  const previous=state.dashboardTheme;
