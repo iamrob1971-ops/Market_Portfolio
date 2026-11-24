@@ -53,6 +53,7 @@ header h1{font-size:22px;margin:0}header small{color:#b6c8da}main{max-width:1280
 .holdings-column-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:4px 16px}
 .holdings-column-grid label{font-size:13px;margin:3px 0;display:flex;align-items:center;gap:8px}
 .holdings-column-grid input{width:auto;margin:0}
+.quote-time{display:block;font-size:10.5px;line-height:1.3;color:#64748b;white-space:nowrap;margin-top:2px}
 .holdings-sort:hover{text-decoration:underline;}
 .holdings-sort:focus-visible{outline:2px solid #2563eb;outline-offset:2px;border-radius:3px;}
 </style>
@@ -199,7 +200,7 @@ function render(){
   const q=usableMarketQuote(h),price=effectivePrice(h),prior=Number(q?.previousClose??h.previousClose),v=estimatedValue(h),p=estimatedProfit(h);
   const eligible=h.kind!=="money"&&(!h.currency||h.currency==="USD")&&/^[A-Z][A-Z0-9.-]{0,14}$/.test(String(h.symbol||"").toUpperCase());
   const action=eligible?'<button type="button" class="ticker-refresh" data-refresh-ticker="'+esc(h.symbol.toUpperCase())+'" title="Refresh only '+esc(h.symbol)+' from Finnhub" aria-label="Refresh quote for '+esc(h.symbol)+'">↻</button> ':'';
-  const quoteTime=q?'<small style="display:block;color:#2563eb">Finnhub · '+esc(new Date(q.asof).toLocaleString())+'</small>':'<small style="display:block;color:#64748b">'+esc(h.quoteSource||"Recorded")+'</small>';
+  const quoteTime=q?'<small class="quote-time" title="Quote observed '+esc(new Date(q.asof).toLocaleString())+'">'+esc(new Intl.DateTimeFormat("en-US",{month:"numeric",day:"numeric",hour:"numeric",minute:"2-digit"}).format(new Date(q.asof)))+'</small>':'<small class="quote-time" title="'+esc(h.quoteSource||"Recorded price")+'">Broker snapshot</small>';
   const brokerPrice=h.source==="snaptrade"?'Broker price '+money(h.price):'Recorded price '+money(h.price);
   const cell={
     account:esc(label(state.accounts.find(a=>a.id===h.accountId))),
