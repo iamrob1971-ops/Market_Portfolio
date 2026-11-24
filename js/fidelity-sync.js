@@ -9,7 +9,9 @@ const message=document.getElementById("fidelity-sync-status");
 const details=document.getElementById("fidelity-sync-details");
 const paste=document.getElementById("fidelity-sync-paste");
 const pasteButton=document.getElementById("fidelity-sync-paste-apply");
-if(!button||!message||!details||!paste||!pasteButton)return;
+const loginButton=document.getElementById("fidelity-login");
+const diagnosticButton=document.getElementById("fidelity-diagnostic");
+if(!button||!message||!details||!paste||!pasteButton||!loginButton||!diagnosticButton)return;
 let popup=null,nonce=null,working=false;
 const validNumber=v=>v!==null&&v!==undefined&&v!==""&&Number.isFinite(Number(v));
 const number=v=>Number(v);
@@ -31,7 +33,7 @@ function renderConnected(){
  const ul=document.createElement("ul");
  for(const a of list){
   const li=document.createElement("li"),c=a.connected;
-  li.textContent=a.name+": "+fmtMoney(c.reportedEquity)+" reported equity; "+(c.positionCount??0)+" positions; provider data "+(c.asOf||"timestamp unavailable");
+  li.textContent=a.name+": "+fmtMoney(c.reportedEquity)+" reported equity; "+(c.positionCount??0)+" positions; "+(c.basisMissing||0)+" missing basis; provider as-of "+(c.asOf||"unknown");
   ul.append(li);
  }
  details.append(ul);
@@ -40,13 +42,50 @@ function renderConnected(){
  note.textContent="Fidelity totals use SnapTrade-reported equity. Reported cash overlapping SPAXX/FDRXX is shown for reference but not added twice.";
  details.append(note);
 }
-button.addEventListener("click",()=>{
+// Primary path: direct authenticated GET to Azure. Browser must allow the
+// approved GitHub Pages origin with credentials; Azure still checks Entra OID.
+async function refreshDirect(){
  if(working)return;
- nonce=crypto.randomUUID();
- const url=AZURE_ORIGIN+"/api/brokerage/fidelity?sync="+encodeURIComponent(nonce);
- popup=window.open(url,"marketPortfolioFidelitySync");
- if(!popup){showStatus("Your browser blocked the Fidelity window. Allow pop-ups for this site and try again.");return}
- showStatus("In the secure Fidelity window, click Retrieve Fidelity preview, then Send to Market Portfolio.");
+ button.disabled=true;
+ showStatus("Connecting securely to Azure and requesting the Fidelity snapshot...");
+ try{
+  const ctrl=new AbortController(),timeout=setTimeout(()=>ctrl.abort(),45000);
+  let response;
+  try{
+   response=await fetch(AZURE_ORIGIN+"/api/brokerage/fidelity/preview",{
+    method:"GET",mode:"cors",credentials:"include",cache:"no-store",
+    headers:{"Accept":"application/json"},signal:ctrl.signal
+   });
+  }finally{clearTimeout(timeout)}
+  if(response.status===401||response.status===403){
+   showStatus("Microsoft sign-in is required or this identity is not authorized ("+response.status+"). Use Sign in / reconnect, then Refresh Fidelity.");
+   return;
+  }
+  const type=response.headers.get("content-type")||"";
+  if(!response.ok||!type.includes("application/json")){
+   let detail="";if(type.includes("application/json"))try{detail=(await response.json()).error||""}catch(_){}
+   throw Error("Azure HTTP "+response.status+(detail?": "+detail:""));
+  }
+  const data=await response.json();
+  // Reuse the same validation and explicit confirmation as the existing import.
+  await receiveSnapshot(data);
+ }catch(error){
+  showStatus(error?.name==="AbortError"?
+   "Fidelity request timed out; no records changed.":
+   error instanceof TypeError?
+   "Browser could not read the secure Azure response. Sign in using the same browser, then retry. If this persists, Azure cross-origin credential/CORS settings may need updating. Existing data was not changed.":
+   "Refresh failed: "+String(error.message||error)+". Existing data was not changed.");
+ }finally{button.disabled=false}
+}
+button.addEventListener("click",()=>void refreshDirect());
+loginButton.addEventListener("click",()=>{
+ const win=window.open(AZURE_ORIGIN+"/.auth/login/aad","marketPortfolioAzureLogin");
+ if(!win)showStatus("Allow pop-ups for this site to open the Microsoft sign-in page.");
+ else showStatus("Complete Microsoft sign-in in the new window, then return here and click Refresh Fidelity.");
+});
+diagnosticButton.addEventListener("click",()=>{
+ const win=window.open(AZURE_ORIGIN+"/api/brokerage/fidelity","marketPortfolioFidelityDiagnostic");
+ if(!win)showStatus("Allow pop-ups to open the secure diagnostic viewer.");
 });
 function prepare(payload){
  if(!payload||payload.source!=="SnapTrade Commercial Test / Fidelity"||!Array.isArray(payload.accounts))throw Error("Unexpected brokerage preview format.");
@@ -132,7 +171,15 @@ function buildReplacement(converted){
   for(const h of a.positions){
    const same=oldConnected.find(x=>x.id===h.id);
    const basketId=same?.basketId||matchOldBasket(obsolete,oldHoldings,a,h)||null;
-   newHoldings.push({...h,basketId});
+   // Keep locally verified reference data and annotations without modifying
+   // broker-owned quantity, price, basis or reported account equity.
+   const kept=same?{
+     previousClose:same.previousClose??null,
+     previousCloseSource:same.previousCloseSource||null,
+     previousCloseAsOf:same.previousCloseAsOf||null,
+     localNotes:same.localNotes||null
+   }:{};
+   newHoldings.push({...h,...kept,basketId});
   }
  }
  next.accounts=[...state.accounts.filter(a=>!oldIds.has(a.id)),...accountsToAdd];
@@ -143,7 +190,9 @@ function buildReplacement(converted){
  next.pendingAdjustments=state.pendingAdjustments.filter(p=>!oldIds.has(p.accountId));
  next.reconciliations=state.reconciliations.filter(r=>!oldIds.has(r.parentAccountId)&&!oldIds.has(r.childAccountId));
  next.transactions=state.transactions.filter(t=>!oldIds.has(t.accountId)&&!oldHoldingIds.has(t.holdingId));
- next.dividends=state.dividends.filter(d=>!oldHoldingIds.has(d.holdingId));
+ // Preserve custom dividend profiles for the same stable SnapTrade holding IDs.
+ const newIds=new Set(newHoldings.map(h=>h.id));
+ next.dividends=state.dividends.filter(d=>!oldHoldingIds.has(d.holdingId)||newIds.has(d.holdingId));
  // Keep non-Fidelity manual data, owner groups, baskets, watchlists and historical snapshots.
  return {next,removed:obsolete.length,positions:newHoldings.length};
 }
@@ -155,7 +204,7 @@ async function receiveSnapshot(payload){
   const previous=state.accounts.filter(isFidelity);
   const sum=converted.reduce((n,a)=>n+a.connected.reportedEquity,0);
   const rows=converted.map(a=>a.name+" - "+fmtMoney(a.connected.reportedEquity)+" ("+a.positions.length+" positions)").join("\n");
-  const ok=confirm("REPLACE Fidelity records in this browser?\n\n"+rows+
+  const ok=confirm("REPLACE / REFRESH Fidelity records in this browser?\n\n"+rows+
    "\n\n"+converted.length+" connected accounts; reported equity "+fmtMoney(sum)+
    "\nRemove "+previous.length+" existing Fidelity account records and their old holdings, cash, adjustments and related transaction/dividend records."+
    "\nAll other brokerages stay unchanged. No extra backup will be created.\n\nConfirm only if ALL accounts above are Fidelity.");
@@ -164,7 +213,7 @@ async function receiveSnapshot(payload){
   const old=state;
   try{state=built.next;await save()}
   catch(e){state=old;render();throw e}
-  showStatus("Fidelity sync complete: "+converted.length+" connected accounts, "+built.positions+" positions. Replaced "+built.removed+" old Fidelity accounts.");
+  showStatus("Fidelity refreshed: "+converted.length+" connected accounts and "+built.positions+" positions. Source snapshot "+(payload.retrievedAt||"time unknown")+". Replaced "+built.removed+" Fidelity account records; unrelated brokers untouched.");
   paste.value=""; // Do not retain a second copy of the private snapshot in the input field.
   nonce=null;
   renderConnected();
