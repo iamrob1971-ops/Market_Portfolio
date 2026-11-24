@@ -20,7 +20,7 @@ header h1{font-size:22px;margin:0}header small{color:#b6c8da}main{max-width:1280
 <small class="muted" style="display:block;margin-top:12px">Data updates independently by provider and retains the recorded observation time. Use Actual Indexes for FMP settings and Price Refresh for commodity updates.</small>
 </div><div class="grid"><div class="card"><h2>Account Breakdown</h2><div id="accountBreakdown"></div></div><div class="card"><h2>Managed Accounts</h2><small>Separate owner groups are excluded from My Portfolio totals unless explicitly selected.</small><div id="managedSummary"></div></div></div><div class="card"><div class="row"><h2>Portfolio Snapshots</h2><button id="saveSnapshot" class="btn">Save snapshot</button></div><div id="snapshots"></div></div><div class="card"><h2>Statement Reconciliation</h2><div id="reconciliation"></div></div></section>
 <section id="accounts" class="tab"><div class="grid"><div class="card"><h2>Owner Groups</h2><form id="ownerForm" class="formgrid"><label>Group name<input name="name" required placeholder="e.g. Mom"></label><label>Reporting group<select name="primary"><option value="false">Managed / separate</option><option value="true">Include in My Portfolio</option></select></label><div class="actions"><button class="btn">Add owner group</button></div></form><div id="ownerList"></div></div><div class="card"><h2>Add Account</h2><form id="accountForm" class="formgrid"><label>Owner group<select name="ownerId" id="accountOwner" required></select></label><label>Brokerage<input name="broker" required placeholder="Fidelity"></label><label>Account label<input name="name" required placeholder="Roth IRA"></label><label>Account type<select name="type"><option>Brokerage</option><option>Roth IRA</option><option>Traditional IRA</option><option>Joint</option><option>Custodial</option><option>401(k)</option><option>Other</option></select></label><div class="actions"><button class="btn">Add account</button></div></form></div></div><div class="card"><h2>Accounts</h2><div id="accountsTable"></div></div></section>
-<section id="holdings" class="tab"><div class="card"><h2>Add / Update Holding</h2><small>Enter aggregate position cost basis, not per-share purchase price. A position is unique by account and ticker.</small><form id="holdingForm" class="formgrid"><label>Account<select name="accountId" id="holdingAccount" required></select></label><label>Ticker<input name="symbol" required placeholder="SCHD"></label><label>Quantity<input name="quantity" type="number" step="any" min="0" required></label><label>Total cost basis ($)<input name="basis" type="number" step="any" min="0" required></label><label>Manual price ($)<input name="price" type="number" step="any" min="0" required></label><label>Type<select name="kind"><option value="security">Stock / ETF / Fund</option><option value="money">Money market fund</option></select></label><div class="actions"><button class="btn">Save holding</button></div></form></div><div class="card"><h2>Cash Balances</h2><form id="cashForm" class="formgrid"><label>Account<select name="accountId" id="cashAccount" required></select></label><label>Cash balance ($)<input name="amount" type="number" step="any" min="0" required></label><div class="actions"><button class="btn">Save cash</button></div></form><small>Enter only cash not already counted as a money market position. Each account has one manual cash balance.</small></div><div class="card"><div class="row"><h2>Holdings & P&L</h2><button class="btn secondary" id="exportHoldings">Export holdings CSV</button></div><div id="holdingsTable"></div></div></section>
+<section id="holdings" class="tab"><div class="card"><h2>Add / Update Holding</h2><small>Enter aggregate position cost basis, not per-share purchase price. A position is unique by account and ticker.</small><form id="holdingForm" class="formgrid"><label>Account<select name="accountId" id="holdingAccount" required></select></label><label>Ticker<input name="symbol" required placeholder="SCHD"></label><label>Quantity<input name="quantity" type="number" step="any" min="0" required></label><label>Total cost basis ($)<input name="basis" type="number" step="any" min="0" required></label><label>Manual price ($)<input name="price" type="number" step="any" min="0" required></label><label>Type<select name="kind"><option value="security">Stock / ETF / Fund</option><option value="money">Money market fund</option></select></label><div class="actions"><button class="btn">Save holding</button></div></form></div><div class="card"><h2>Cash Balances</h2><form id="cashForm" class="formgrid"><label>Account<select name="accountId" id="cashAccount" required></select></label><label>Cash balance ($)<input name="amount" type="number" step="any" min="0" required></label><div class="actions"><button class="btn">Save cash</button></div></form><small>Enter only cash not already counted as a money market position. Each account has one manual cash balance.</small></div><div class="card"><div class="row"><h2>Holdings & P&L</h2><div class="actions" style="margin:0"><button class="btn secondary" id="holdings-config-toggle" type="button" aria-expanded="false" aria-controls="holdings-column-config">⚙ Customize columns</button><button class="btn secondary" id="exportHoldings">Export holdings CSV</button></div></div><div id="holdings-column-config" class="hidden holdings-config"><strong>Select columns</strong><p class="muted" style="margin:4px 0 10px">Choose the fields to display; Save View remembers them on this browser.</p><div class="holdings-column-grid" id="holdings-column-options"></div><div class="actions"><button type="button" class="btn" id="holdings-view-save">Save View</button><button type="button" class="btn secondary" id="holdings-view-reset">Restore Default</button><span class="muted" id="holdings-view-status"></span></div></div><div id="holdingsTable"></div></div></section>
 <section id="transactions" class="tab"><div class="card"><h2>Record Buy / Sell</h2><p class="muted">Local journal only — no brokerage order is placed. Select the exact holding row, particularly when the same ticker has multiple imported lots. Sales use proportional cost basis, not a tax-lot election.</p><form id="txForm" class="formgrid">
 <label>Holding<select name="holdingId" id="txHolding" required></select></label>
 <label>Action<select name="side"><option>BUY</option><option>SELL</option></select></label>
@@ -49,6 +49,10 @@ header h1{font-size:22px;margin:0}header small{color:#b6c8da}main{max-width:1280
 #accountBreakdown th:nth-child(3),#accountBreakdown td:nth-child(3){width:26%;text-align:right;white-space:nowrap;font-variant-numeric:tabular-nums}
 #accountBreakdown td:nth-child(n+2){font-size:13px}
 @media(max-width:600px){#accountBreakdown table{min-width:435px}}
+.holdings-config{border:1px solid #dbe3ec;background:#f8fafc;padding:14px;margin:12px 0;border-radius:10px}
+.holdings-column-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:4px 16px}
+.holdings-column-grid label{font-size:13px;margin:3px 0;display:flex;align-items:center;gap:8px}
+.holdings-column-grid input{width:auto;margin:0}
 .holdings-sort:hover{text-decoration:underline;}
 .holdings-sort:focus-visible{outline:2px solid #2563eb;outline-offset:2px;border-radius:3px;}
 </style>
@@ -60,6 +64,26 @@ const esc=s=>String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&
 const blank=()=>({version:1,owners:[{id:"me",name:"Me",primary:true},{id:"mom",name:"Mom",primary:false},{id:"children",name:"Children",primary:false}],accounts:[],holdings:[],cash:[],dividends:[],market:[],snapshots:[],baskets:[],pendingAdjustments:[],reconciliations:[],transactions:[],quoteHistory:[]});
 let state=blank(),db,filter="mine",staged=null,stagedQuotes=null;
 let holdingsSort={key:null,direction:"asc"};
+const holdingColumnDefs=[
+ ["account","Account"],["ticker","Ticker"],["shares","Shares"],
+ ["last","Last Price"],["broker","Broker Price"],["previous","Previous Close"],
+ ["change","Day Change"],["positionDay","Position Day Change"],
+ ["value","Market Value"],["basis","Basis"],["pnl","Unrealized P&L"],
+ ["source","Price Source"],["action","Action"]
+];
+const defaultHoldingColumns=["account","ticker","shares","last","previous","change","positionDay","value","basis","pnl","action"];
+let pendingHoldingColumns=null;
+function holdingColumns(){
+ const valid=new Set(holdingColumnDefs.map(d=>d[0]));
+ const saved=state.holdingsView?.columns;
+ return Array.isArray(saved)&&saved.includes("ticker")&&saved.includes("last")&&saved.every(x=>valid.has(x))&&new Set(saved).size===saved.length?saved:defaultHoldingColumns;
+}
+function holdingColumnOptions(){
+ const selected=new Set(pendingHoldingColumns||holdingColumns()),panel=$("holdings-column-options");
+ if(!panel)return;
+ panel.innerHTML=holdingColumnDefs.map(([key,name])=>'<label><input type="checkbox" data-holding-column="'+esc(key)+'" '+(selected.has(key)?"checked":"")+' '+(["ticker","last"].includes(key)?"disabled":"")+'>'+esc(name)+'</label>').join("");
+}
+
 const holdingsSortColumns={Ticker:"ticker",Shares:"shares","Day Change":"dayPct","Market Value":"marketValue","Unrealized P&L":"pnl"};
 function sortedHoldings(rows){
  if(!holdingsSort.key)return rows;
@@ -168,17 +192,63 @@ function render(){
  selectOptions($("accountOwner"),state.owners,x=>x.name);selectOptions($("holdingAccount"),state.accounts,label);selectOptions($("cashAccount"),state.accounts,label);selectOptions($("divHolding"),state.holdings,x=>x.symbol+" — "+label(state.accounts.find(a=>a.id===x.accountId)));
  $("ownerList").innerHTML=table(["Owner","My portfolio?","Action"],state.owners.map(x=>'<tr>'+td(esc(x.name))+td(x.primary?"Yes":"No")+td(x.id==="me"?"Default":b("toggleOwner",x.id,x.primary?"Exclude":"Include"))+'</tr>'));
  $("accountsTable").innerHTML=table(["Owner","Broker","Label","Type","Value","Action"],state.accounts.map(a=>'<tr>'+td(esc(state.owners.find(o=>o.id===a.ownerId)?.name||"Unknown"))+td(esc(a.broker))+td(esc(a.name)+(a.connected?.provider==="snaptrade"?' <span class="pill">Connected · SnapTrade</span>':""))+td(esc(a.type))+td(money(totals([a]).total))+td(a.connected?.provider==="snaptrade"?"Synced":b("deleteAccount",a.id,"Delete"))+'</tr>'));
- $("holdingsTable").innerHTML=holdingsTable(["Account","Ticker","Shares","Last Price","Previous Close","Day Change","Position Day Change","Market Value","Basis","Unrealized P&L","Action"],sortedHoldings(hs).map(h=>{
- const q=usableMarketQuote(h),price=effectivePrice(h),prior=Number(q?.previousClose??h.previousClose),v=estimatedValue(h),p=estimatedProfit(h);
- const eligible=h.kind!=="money"&&(!h.currency||h.currency==="USD")&&/^[A-Z][A-Z0-9.-]{0,14}$/.test(String(h.symbol||"").toUpperCase());
- const action=eligible?'<button type="button" class="ticker-refresh" data-refresh-ticker="'+esc(h.symbol.toUpperCase())+'" title="Refresh only '+esc(h.symbol)+' from Finnhub" aria-label="Refresh quote for '+esc(h.symbol)+'">↻</button> ':'';
- const time=q?'<small style="display:block;color:#2563eb">Finnhub · '+esc(new Date(q.asof).toLocaleString())+'</small>'+(h.source==="snaptrade"?'<small style="display:block;color:#64748b">Broker price '+money(h.price)+'</small>':''):'<small style="display:block;color:#64748b">'+esc(h.quoteSource||"Recorded")+'</small>';
- return '<tr>'+td(esc(label(state.accounts.find(a=>a.id===h.accountId))))+td('<strong>'+esc(h.symbol)+'</strong> '+action+(h.kind==="money"?' <span class="pill">Money fund</span>':""))+td(num(h.quantity))+td(money(price)+time)+td(prior>0?money(prior):"—")+td(prior>0?'<span class="'+(price>=prior?"positive":"negative")+'">'+money(price-prior)+' ('+pct((price-prior)/prior*100)+')</span>':"—")+td(prior>0?'<span class="'+(price>=prior?"positive":"negative")+'">'+money((price-prior)*h.quantity)+'</span>':"—")+td(money(v)) +td(h.basis==null?"—":money(h.basis))+td(p==null?"—":'<span class="'+(p>=0?"positive":"negative")+'">'+money(p)+'</span>')+td(h.source==="snaptrade"?"Synced":b("deleteHolding",h.id,"Delete"))+'</tr>';
+ const allHoldingsColumns=holdingColumnDefs.map(x=>x[0]);
+ const visibleHoldingColumns=new Set(holdingColumns());
+ const visibleHoldingsHeaders=holdingColumnDefs.filter(([key])=>visibleHoldingColumns.has(key)).map(([,title])=>title);
+ $("holdingsTable").innerHTML=holdingsTable(visibleHoldingsHeaders,sortedHoldings(hs).map(h=>{
+  const q=usableMarketQuote(h),price=effectivePrice(h),prior=Number(q?.previousClose??h.previousClose),v=estimatedValue(h),p=estimatedProfit(h);
+  const eligible=h.kind!=="money"&&(!h.currency||h.currency==="USD")&&/^[A-Z][A-Z0-9.-]{0,14}$/.test(String(h.symbol||"").toUpperCase());
+  const action=eligible?'<button type="button" class="ticker-refresh" data-refresh-ticker="'+esc(h.symbol.toUpperCase())+'" title="Refresh only '+esc(h.symbol)+' from Finnhub" aria-label="Refresh quote for '+esc(h.symbol)+'">↻</button> ':'';
+  const quoteTime=q?'<small style="display:block;color:#2563eb">Finnhub · '+esc(new Date(q.asof).toLocaleString())+'</small>':'<small style="display:block;color:#64748b">'+esc(h.quoteSource||"Recorded")+'</small>';
+  const brokerPrice=h.source==="snaptrade"?'Broker price '+money(h.price):'Recorded price '+money(h.price);
+  const cell={
+    account:esc(label(state.accounts.find(a=>a.id===h.accountId))),
+    ticker:'<strong>'+esc(h.symbol)+'</strong> '+action+(h.kind==="money"?' <span class="pill">Money fund</span>':""),
+    shares:num(h.quantity),
+    last:money(price)+quoteTime,
+    broker:money(h.price),
+    previous:prior>0?money(prior):"—",
+    change:prior>0?'<span class="'+(price>=prior?"positive":"negative")+'">'+money(price-prior)+' ('+pct((price-prior)/prior*100)+')</span>':"—",
+    positionDay:prior>0?'<span class="'+(price>=prior?"positive":"negative")+'">'+money((price-prior)*h.quantity)+'</span>':"—",
+    value:money(v),
+    basis:h.basis==null?"—":money(h.basis),
+    pnl:p==null?"—":'<span class="'+(p>=0?"positive":"negative")+'">'+money(p)+'</span>',
+    source:q?'Finnhub · '+esc(new Date(q.asof).toLocaleString()):esc(h.quoteSource||"Recorded"),
+    action:h.source==="snaptrade"?"Synced":b("deleteHolding",h.id,"Delete")
+  };
+  return '<tr>'+holdingColumnDefs.filter(([key])=>visibleHoldingColumns.has(key)).map(([key])=>td(cell[key])).join("")+'</tr>';
  }));
 
  $("dividendTable").innerHTML='<div class="grid"><div class="card"><small>Annual income · current selection</small><div class="metric">'+money(t.income)+'</div></div><div class="card"><small>Average monthly equivalent</small><div class="metric">'+money(t.income/12)+'</div></div></div>'+table(["Account","Ticker","Distribution/share","Frequency","Annual Est.","Next date","Action"],hs.filter(h=>state.dividends.some(d=>d.holdingId===h.id)).map(h=>{let d=state.dividends.find(d=>d.holdingId===h.id);return '<tr>'+td(esc(label(state.accounts.find(a=>a.id===h.accountId))))+td(esc(h.symbol))+td(money(d.perShare))+td(num(d.frequency)+"/yr")+td(money(dividends(h)))+td(esc(d.nextDate||"Unknown"))+td(b("deleteDividend",d.id,"Delete"))+'</tr>'}));
  $("marketTable").innerHTML=table(["Indicator","Value","Daily %","Updated","Action"],state.market.map(x=>'<tr>'+td(esc(x.symbol))+td(num(x.value)+" "+esc(x.units))+td(pct(x.change))+td(esc(x.updated.slice(0,16).replace("T"," ")))+td(b("deleteMarket",x.id,"Delete"))+'</tr>'))
 }
+$("holdings-config-toggle").onclick=()=>{
+ const panel=$("holdings-column-config"),opening=panel.classList.contains("hidden");
+ panel.classList.toggle("hidden",!opening);
+ $("holdings-config-toggle").setAttribute("aria-expanded",String(opening));
+ if(opening){pendingHoldingColumns=holdingColumns().slice();holdingColumnOptions()}
+};
+$("holdings-column-options").onchange=event=>{
+ const check=event.target.closest("[data-holding-column]");if(!check)return;
+ pendingHoldingColumns=holdingColumnDefs.map(([key])=>key).filter(key=>{
+  const input=$("holdings-column-options").querySelector('[data-holding-column="'+key+'"]');
+  return input&&input.checked;
+ });
+ if(!pendingHoldingColumns.includes("ticker"))pendingHoldingColumns.push("ticker");
+ if(!pendingHoldingColumns.includes("last"))pendingHoldingColumns.push("last");
+ $("holdings-view-status").textContent="Unsaved changes";
+};
+$("holdings-view-save").onclick=async()=>{
+ const selected=pendingHoldingColumns||holdingColumns();
+ state.holdingsView={columns:selected.slice()};
+ await save();
+ $("holdings-view-status").textContent="View saved locally";
+};
+$("holdings-view-reset").onclick=async()=>{
+ state.holdingsView={columns:defaultHoldingColumns.slice()};pendingHoldingColumns=defaultHoldingColumns.slice();
+ await save();holdingColumnOptions();
+ $("holdings-view-status").textContent="Default view restored";
+};
 document.addEventListener("click",event=>{
  const button=event.target.closest("[data-holdings-sort]");
  if(!button)return;
@@ -229,4 +299,4 @@ for(let row of rows){let q=Object.fromEntries(head.map((k,j)=>[k,String(row[j]||
 stagedQuotes=quotes;$("applyQuotes").disabled=!quotes.length;$("quotePreview").innerHTML='<p class="note">Review unverified quotes before applying. All accounts holding a ticker will receive that price.</p>'+table(["Symbol","Price","As of","Source"],quotes.map(q=>"<tr>"+td(esc(q.symbol))+td(money(q.price))+td(esc(q.asof))+td(esc(q.source))+"</tr>"))}catch(e){stagedQuotes=null;$("applyQuotes").disabled=true;alert(e.message)}};
 $("applyQuotes").onclick=async()=>{if(!stagedQuotes?.length)return;if(!confirm("Apply "+stagedQuotes.length+" externally researched prices?"))return;let count=0;for(let q of stagedQuotes){for(let h of state.holdings.filter(h=>h.symbol.toUpperCase()===q.symbol&&h.source!=="snaptrade"&&!state.accounts.some(a=>a.id===h.accountId&&a.connected?.provider==="snaptrade"))){h.price=q.price;h.marketValue=null;h.quoteAsOf=q.asof;h.quoteSource=q.source;count++}state.quoteHistory.push({...q,id:uid(),importedAt:new Date().toISOString()})}stagedQuotes=null;$("applyQuotes").disabled=true;await save();toast(count+" positions repriced")};
 load().catch(e=>{console.error(e);alert("Local database unavailable: "+e.message)});
-</script><script src="js/integrations.js?v=20261124-security-refresh-1"></script><script src="js/fidelity-sync.js?v=20261123-direct-refresh-1"></script><script src="js/live-markets.js?v=20261124-security-refresh-1"></script><script src="js/key-preferences.js?v=20261120-keys-index-fix-1"></script></body></html>
+</script><script src="js/integrations.js?v=20261124-auto-quote-2"></script><script src="js/fidelity-sync.js?v=20261123-direct-refresh-1"></script><script src="js/live-markets.js?v=20261124-security-refresh-1"></script><script src="js/key-preferences.js?v=20261120-keys-index-fix-1"></script></body></html>
