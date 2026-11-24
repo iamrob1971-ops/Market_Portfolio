@@ -14,6 +14,7 @@ const css=document.createElement("style");
 css.textContent=[
 "#marketAiRail{position:fixed;z-index:90;top:0;right:0;bottom:0;width:min(420px,100vw);background:#fff;color:#16283e;border-left:1px solid #bdcad8;box-shadow:-12px 0 30px #10283b36;display:flex;flex-direction:column}",
 "#marketAiRail[hidden]{display:none}",
+"#marketAiRail.ai-wide{width:min(600px,100vw)}",
 "#marketAiRail .ai-head{padding:14px;background:#11263e;color:#fff;display:flex;align-items:center;justify-content:space-between;gap:8px}",
 "#marketAiRail .ai-body{overflow:auto;padding:14px;flex:1}",
 "#marketAiRail .ai-actions{display:flex;gap:6px;flex-wrap:wrap;margin:10px 0}",
@@ -25,12 +26,12 @@ css.textContent=[
 "#marketAiRail .ai-note{font-size:12px;color:#60728a}",
 "#marketAiRail textarea{min-height:110px;resize:vertical}",
 ".market-ai-row{border:1px solid #c5d3e7;background:#eaf1fc;color:#224d91;border-radius:6px;padding:2px 6px;margin-left:5px;font-size:12px}",
-"body.market-ai-open main{margin-right:min(420px,35vw);max-width:none}",
+"body.market-ai-open main{margin-right:min(var(--ai-rail-width,420px),40vw);max-width:none}",
 "@media(max-width:1100px){body.market-ai-open main{margin-right:0}#marketAiRail{width:min(420px,94vw)}}"
 ].join("\n");document.head.append(css);
 const launch=document.createElement("button");launch.type="button";launch.id="marketAiOpen";launch.className="btn secondary";launch.textContent="✨ AI Research";launch.setAttribute("aria-controls","marketAiRail");launch.setAttribute("aria-expanded","false");document.querySelector("header .row")?.append(launch);
 const rail=document.createElement("aside");rail.id="marketAiRail";rail.hidden=true;rail.setAttribute("aria-label","AI research sidebar");
-rail.innerHTML='<div class="ai-head"><strong id="aiTitle">AI Research</strong><button class="btn secondary" type="button" id="aiClose">Collapse</button></div><div class="ai-body"><p class="ai-note">Phase 1 · AI provider not connected · local questions only</p><label for="aiScope">Scope</label><select id="aiScope"><option value="security">Security</option><option value="portfolio">Portfolio</option><option value="market">Market</option></select><div id="aiTickerBox"><label for="aiTicker">Ticker</label><input id="aiTicker" maxlength="24" placeholder="NVDA"><button class="btn secondary" type="button" id="aiGoTicker">Open ticker</button></div><div class="ai-actions"><button id="aiNew" type="button">New session</button><button id="aiFork" type="button">Fork</button><button id="aiRename" type="button">Rename</button><button id="aiDelete" type="button">Delete</button></div><strong>Sessions</strong><div id="aiHistory" class="ai-history"></div><button id="aiShowAll" type="button" class="btn secondary">Show all</button><h3 id="aiSessionTitle"></h3><div id="aiMessages" aria-live="polite"></div><div class="ai-actions" id="aiPrompts"></div><label for="aiQuestion">Editable research question</label><textarea id="aiQuestion" placeholder="Write your research question"></textarea><p class="ai-note">Saving records your question in this browser, without sending it. No AI answer is generated. Portfolio holdings, account identifiers, cost basis and financial values are never attached.</p><button id="aiSave" type="button" class="btn">Save question locally</button><p id="aiStatus" role="status" class="ai-note"></p></div>';
+rail.innerHTML='<div class="ai-head"><strong id="aiTitle">AI Research</strong><div><button class="btn secondary" type="button" id="aiExpand">Expand</button> <button class="btn secondary" type="button" id="aiClose">Collapse</button></div></div><div class="ai-body"><p class="ai-note">Phase 1 · AI provider not connected · local questions only</p><label for="aiScope">Scope</label><select id="aiScope"><option value="security">Security</option><option value="portfolio">Portfolio</option><option value="market">Market</option></select><div id="aiTickerBox"><label for="aiTicker">Ticker</label><input id="aiTicker" maxlength="24" placeholder="NVDA"><button class="btn secondary" type="button" id="aiGoTicker">Open ticker</button></div><div class="ai-actions"><button id="aiNew" type="button">New session</button><button id="aiFork" type="button">Fork</button><button id="aiRename" type="button">Rename</button><button id="aiDelete" type="button">Delete</button></div><strong>Sessions</strong><div id="aiHistory" class="ai-history"></div><button id="aiShowAll" type="button" class="btn secondary">Show all</button><h3 id="aiSessionTitle"></h3><div id="aiMessages" aria-live="polite"></div><div class="ai-actions" id="aiPrompts"></div><label for="aiQuestion">Editable research question</label><textarea id="aiQuestion" placeholder="Write your research question"></textarea><p class="ai-note">Saving records your question in this browser, without sending it. No AI answer is generated. Portfolio holdings, account identifiers, cost basis and financial values are never attached.</p><button id="aiSave" type="button" class="btn">Save question locally</button><p id="aiStatus" role="status" class="ai-note"></p></div>';
 document.body.append(rail);
 let current=null,opened=false,all=false;
 const topics=()=>{if(!Array.isArray(state.aiThreads))state.aiThreads=[];return state.aiThreads};
@@ -60,8 +61,9 @@ function openTopic(scope="portfolio",symbol="",newSession=false){
  if(topics().length!==oldCount)persist().catch(e=>$("aiStatus").textContent="Save failed: "+e.message);
 }
 launch.onclick=()=>openTopic("portfolio");
+$("aiExpand").onclick=()=>{const wide=rail.classList.toggle("ai-wide");$("aiExpand").textContent=wide?"Narrow":"Expand";document.body.style.setProperty("--ai-rail-width",wide?"600px":"420px")};
 $("aiClose").onclick=()=>{opened=false;rail.hidden=true;document.body.classList.remove("market-ai-open");launch.setAttribute("aria-expanded","false")};
-$("aiScope").onchange=e=>openTopic(e.target.value,e.target.value==="security"?$("aiTicker").value||"AAPL":"");
+$("aiScope").onchange=e=>{if(e.target.value==="security"&&!normalize($("aiTicker").value)){ $("aiScope").value=current?.topicType||"portfolio";$("aiStatus").textContent="Enter a ticker using the ticker field to open security research.";return}openTopic(e.target.value,e.target.value==="security"?$("aiTicker").value:"")};
 $("aiGoTicker").onclick=()=>openTopic("security",$("aiTicker").value);
 $("aiTicker").onkeydown=e=>{if(e.key==="Enter")openTopic("security",e.target.value)};
 $("aiNew").onclick=()=>openTopic(current?.topicType||"portfolio",current?.topicType==="security"?current.topicKey:"",true);
