@@ -97,18 +97,20 @@ function budget(){
 function consume(){const b=budget();used=b.count+1;try{sessionStorage.setItem(b.key,String(used))}catch(e){}}
 const fmtChange=n=>Number.isFinite(n)?(n>0?"+":"")+num(n):"—";
 function renderIndexes(){let data=state.indexQuotes||{},rows=indexes.map(([symbol,name])=>{let v=data[symbol],p=Number(v?.price),c=v?.change===null?NaN:Number(v?.change),pct=Number.isFinite(c)&&p-c!==0?100*c/(p-c):NaN;return '<tr><td>'+safe(name)+'</td><td>'+(p>0?num(p):"—")+'</td><td>'+fmtChange(c)+'</td><td>'+(Number.isFinite(pct)?pct.toFixed(2)+"%":"—")+'</td><td>'+safe(v?.asof?new Date(v.asof).toLocaleString():v?.fetchedAt?"Fetched "+new Date(v.fetchedAt).toLocaleString()+" (quote time not supplied)":"—")+'</td></tr>'}).join("");const html='<table><thead><tr><th>Index</th><th>Points</th><th>Change</th><th>% Chg</th><th>As of</th></tr></thead><tbody>'+rows+'</tbody></table>';$("fmp-results").innerHTML=html;const dashboard=$("fmp-dashboard");if(dashboard)dashboard.innerHTML=html}
-async function fetchIndexes(force){
+async function fetchIndexes(force,onlySymbol){
  if(pending||document.hidden||(!force&&!marketOpen()))return;
  const key=$("fmp-key").value.trim();
  if(!key){enabled=false;return $("fmp-status").textContent="Enter FMP key for individual index quotes."}
  const interval=Number($("fmp-interval").value);
  if(Date.now()-lastQuery<20000)return $("fmp-status").textContent="Please wait before testing again.";
  if(!force&&Date.now()-lastQuery<interval)return;
- if(budget().count+3>210){enabled=false;return $("fmp-status").textContent="Conservative 210-call daily browser budget reached; auto stopped."}
+ const targets=onlySymbol?indexes.filter(([symbol])=>symbol===onlySymbol):indexes;
+ if(!targets.length)return {error:"Unknown index symbol"};
+ if(budget().count+targets.length>210){enabled=false;return {error:"Conservative 210-call browser budget reached."}}
  pending=true;lastQuery=Date.now();
  let hits=0,errors=[],updates={};
  try{
-  for(const [symbol,label] of indexes){
+  for(const [symbol,label] of targets){
    if(budget().count>=210){errors.push("Daily browser request allowance reached.");break}
    consume();
    $("fmp-status").textContent="Testing "+label+" via /stable/quote ("+budget().count+" calls today)...";
@@ -133,19 +135,25 @@ async function fetchIndexes(force){
     if(!Number.isFinite(change))change=null;
     updates[symbol]={price:Number(q.price),change,asof,fetchedAt:new Date().toISOString(),source:"FMP individual index quote"};hits++;
    }catch(e){errors.push(label+": "+(e?.name==="AbortError"?"timeout":String(e.message||e)))}
-   if(symbol!==indexes[indexes.length-1][0])await new Promise(resolve=>setTimeout(resolve,350));
+   if(symbol!==targets[targets.length-1][0])await new Promise(resolve=>setTimeout(resolve,350));
   }
   if(hits){
    state.indexQuotes={...(state.indexQuotes||{}),...updates};
    await save();renderIndexes();
-   $("fmp-status").textContent=hits+" of 3 index quotes updated; "+budget().count+" browser calls today."+(errors.length?" Issues: "+errors.join("; "):"");
+   $("fmp-status").textContent=hits+" of "+targets.length+" index quotes updated; "+budget().count+" browser calls today."+(errors.length?" Issues: "+errors.join("; "):"");
   }else{
    enabled=false;
    $("fmp-status").textContent="No valid actual index quotes. "+errors.join("; ")+" Auto stopped; previously saved data untouched.";
   }
   if(errors.length)enabled=false;
  }finally{pending=false}
+ return hits?{ok:true}:{error:"No valid index quote: "+errors.join("; ")};
 }
+window.marketIndexRefresh=async symbol=>{
+ if(!$("fmp-key").value.trim())return {error:"Enter your FMP API key under Actual Indexes first."};
+ if(pending)return {error:"An index refresh is already running."};
+ return fetchIndexes(true,symbol);
+};
 function startTimer(){if(timer)clearInterval(timer);timer=setInterval(()=>{if(enabled&&!document.hidden)void fetchIndexes(false)},15000)}
 $("fmp-start").onclick=()=>{if(!$("fmp-key").value.trim())return alert("Enter FMP key.");enabled=true;startTimer();if(marketOpen())void fetchIndexes(true);else $("fmp-status").textContent="Auto enabled for regular market hours. Use Test once to check individual index access now."};
 $("fmp-test").onclick=()=>void fetchIndexes(true);
