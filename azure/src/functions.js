@@ -86,3 +86,6 @@ app.http("ask", {
 
 // Register the private read-only Fidelity routes without changing existing handlers.
 require("./brokerage");
+
+// Separate Schwab routes; existing Fidelity adapter is unchanged.
+require("./schwab");
