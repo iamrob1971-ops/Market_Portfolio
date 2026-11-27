@@ -93,6 +93,11 @@ header h1{font-size:22px;margin:0}header small{color:#b6c8da}main{max-width:1280
 #dashboard.dashboard-dark .dashboard-holdings-tools input::placeholder{color:#b5c3d4}
 @media(max-width:1150px){#dashboard .dashboard-ticker-strip{grid-template-columns:repeat(3,minmax(0,1fr))}#dashboard .dashboard-hero{grid-template-columns:1fr}#dashboard .dashboard-kpi{border-left:0;border-top:1px solid var(--dash-border);padding:9px}}
 @media(max-width:700px){#dashboard .dashboard-ticker-strip{grid-template-columns:repeat(2,minmax(0,1fr))}#dashboard .dashboard-hero{padding:16px}#dashboard .dashboard-secondary-grid{grid-template-columns:1fr}#dashboard .dashboard-holdings-tools input{width:100%}#dashboard .dashboard-holdings-tools{width:100%}#dashboard .dashboard-kpi-grid{gap:4px}#dashboard .dashboard-big-number{font-size:30px}#dashboard .dashboard-heading{font-size:19px}}
+.holding-ticker-layout{display:grid;grid-template-columns:minmax(62px,auto) 34px 54px;align-items:center;gap:6px;width:max-content}
+.holding-ticker-name{display:flex;flex-direction:column;align-items:flex-start;line-height:1.2;min-width:0}
+.holding-ticker-name .holding-money-badge{font-size:9px;padding:2px 5px;margin-top:3px;white-space:nowrap}
+.holding-ticker-refresh,.holding-ticker-ai{display:flex;align-items:center;justify-content:center}
+.holding-ticker-layout .market-ai-row{margin-left:0;white-space:nowrap}
 </style></head><body>
 <header><div><h1>◈ Market Portfolio</h1><small>Local-first investment dashboard · Connected + manual</small></div><div class="row"><select class="top-select" id="ownerFilter" aria-label="Portfolio view"></select><button class="btn secondary" id="recalculate">↻ Recalculate</button></div></header>
 <main><div class="note">Portfolio records stay in this browser. Connected Fidelity accounts use secured SnapTrade snapshots through Azure; other accounts may be manual. Broker-reported equity is used for connected account totals. Market quotes are maintained separately. Never enter brokerage credentials here.</div>
@@ -432,7 +437,7 @@ function render(){
   const brokerPrice=h.source==="snaptrade"?'Broker price '+money(h.price):'Recorded price '+money(h.price);
   const cell={
     account:esc(label(state.accounts.find(a=>a.id===h.accountId))),
-    ticker:'<strong>'+esc(h.symbol)+'</strong> '+action+'<button type="button" class="market-ai-row" data-ai-holding="'+esc(String(h.symbol||"").toUpperCase())+'" title="Open AI research for '+esc(h.symbol)+'" aria-label="Open AI research for '+esc(h.symbol)+'">✨ AI</button>'+(h.kind==="money"?' <span class="pill">Money fund</span>':""),
+    ticker:'<div class="holding-ticker-layout"><div class="holding-ticker-name"><strong>'+esc(h.symbol)+'</strong>'+(h.kind==="money"?' <span class="pill holding-money-badge">Money fund</span>':"")+'</div><div class="holding-ticker-refresh">'+action+'</div><div class="holding-ticker-ai">'+'<button type="button" class="market-ai-row" data-ai-holding="'+esc(String(h.symbol||"").toUpperCase())+'" title="Open AI research for '+esc(h.symbol)+'" aria-label="Open AI research for '+esc(h.symbol)+'">✨ AI</button>'+'</div></div>',
     shares:num(h.quantity),
     last:money(price)+quoteTime,
     broker:money(h.price),
