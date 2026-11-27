@@ -15,7 +15,7 @@ const ids={Market_AI_Threads:"ThreadId",Market_AI_Messages:"MessageId",Market_Ch
 let app=null,account=null,busy=false;
 const nav=document.querySelector("main nav");if(!nav)return;
 const button=document.createElement("button");button.type="button";button.textContent="SharePoint";button.dataset.tab="sharepoint-connection";nav.append(button);
-const panel=document.createElement("section");panel.id="sharepoint-connection";panel.className="tab";panel.innerHTML='<div class="card"><h2>SharePoint connection</h2><p class="muted">Connect to Microsoft and verify the four configured Market lists. This release reads site and column metadata only. It does not read list records, upload holdings, save checkpoints remotely, or change permissions.</p><p><strong>Site:</strong> rmr1971.sharepoint.com/sites/Bible_App</p><div class="actions"><button type="button" class="btn" id="marketSpConnect">Connect to Microsoft</button><button type="button" class="btn secondary" id="marketSpVerify" disabled>Verify lists and schema</button><button type="button" class="btn secondary" id="marketSpDisconnect" disabled>Disconnect</button></div><p id="marketSpStatus" role="status" class="muted">Not connected.</p><div id="marketSpResults"></div></div>';nav.parentNode.append(panel);
+const panel=document.createElement("section");panel.id="sharepoint-connection";panel.className="tab";panel.innerHTML='<div class="card"><h2>SharePoint connection</h2><p class="muted">Connect to Microsoft and verify the four configured Market lists. Verification reads metadata only. Separate manual synchronization controls below transfer selected records after review. No permission changes are made.</p><p><strong>Site:</strong> rmr1971.sharepoint.com/sites/Bible_App</p><div class="actions"><button type="button" class="btn" id="marketSpConnect">Connect to Microsoft</button><button type="button" class="btn secondary" id="marketSpVerify" disabled>Verify lists and schema</button><button type="button" class="btn secondary" id="marketSpDisconnect" disabled>Disconnect</button></div><p id="marketSpStatus" role="status" class="muted">Not connected.</p><div id="marketSpResults"></div></div>';nav.parentNode.append(panel);
 button.onclick=()=>tab("sharepoint-connection");
 const el=id=>document.getElementById(id),status=s=>el("marketSpStatus").textContent=s;
 function controls(){el("marketSpConnect").disabled=busy||!!account;el("marketSpVerify").disabled=busy||!account;el("marketSpDisconnect").disabled=busy||!account}
@@ -33,5 +33,38 @@ try{const columns=await pages(BASE+"/sites/"+encodeURIComponent(site.id)+"/lists
 const key=byName.get(ids[name]);if(key&&!key.enforceUniqueValues)problems.push("Enable unique values on "+ids[name]+".");if(key&&!key.required)problems.push("Make "+ids[name]+" required.");
 const ok=problems.length===0;if(ok)passed++;renderResult(name,["List GUID: "+list.id,"Expected fields: "+Object.keys(expected).length,...(ok?["All expected names and types matched; unique ID is required and enforced."]:problems)],ok)}catch(e){renderResult(name,[e.message],false)}}
 status("Verified "+passed+" of 4 list schemas. No list records were read or changed.")}catch(e){status("Verification failed: "+e.message)}finally{busy=false;controls()}};
+
+window.MarketSharePoint={
+ async run(work){
+  if(busy||!account)throw Error("Connect to Microsoft first, and finish any active operation.");
+  busy=true;controls();
+  try{
+   const access=await token(),site=await get(BASE+"/sites/"+HOST+":"+SITE,access);
+   const lists=await pages(BASE+"/sites/"+encodeURIComponent(site.id)+"/lists?$select=id,name,displayName",access);
+   const paths={};
+   for(const name of Object.keys(schema)){
+    const list=lists.find(x=>x.name===name||x.displayName===name);
+    if(!list)throw Error("Missing list "+name);
+    const path=BASE+"/sites/"+encodeURIComponent(site.id)+"/lists/"+encodeURIComponent(list.id);
+    const cols=await pages(path+"/columns",access);
+    const map=new Map(cols.map(c=>[c.name,c]));
+    for(const [field,type] of Object.entries(schema[name]))if(!map.has(field)||!typeMatches(map.get(field),type))throw Error(name+": invalid column "+field);
+    const k=map.get(ids[name]);if(!k.required||!k.enforceUniqueValues)throw Error(name+": unique required identifier needed.");
+    paths[name]=path;
+   }
+   return await work({
+    read:async name=>{if(!paths[name])throw Error("Unknown list");return pages(paths[name]+"/items?$expand=fields",access)},
+    insert:async(name,fields)=>{
+     if(!paths[name])throw Error("Unknown list");
+     for(const k of Object.keys(fields))if(!Object.hasOwn(schema[name],k))throw Error("Unexpected field "+k);
+     const res=await fetch(paths[name]+"/items",{method:"POST",headers:{Authorization:"Bearer "+access,"Content-Type":"application/json"},body:JSON.stringify({fields})});
+     if(!res.ok)throw Error(name+": create failed (HTTP "+res.status+"). Recheck before retrying.");
+     return res.json();
+    }
+   });
+  }finally{busy=false;controls()}
+ }
+};
+
 controls();
 })();
