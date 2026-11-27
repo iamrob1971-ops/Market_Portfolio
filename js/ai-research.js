@@ -1,4 +1,4 @@
-/* Local research threads: no account transmission or provider calls. */
+/* Local-first research threads with opt-in Gemini browser requests. */
 (()=>{
 "use strict";
 const $=id=>document.getElementById(id), clean=x=>String(x??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
@@ -25,13 +25,15 @@ css.textContent=[
 "#marketAiRail .ai-message{padding:10px;margin:8px 0;background:#f2f5fa;border-radius:8px;white-space:pre-wrap;overflow-wrap:anywhere}",
 "#marketAiRail .ai-note{font-size:12px;color:#60728a}",
 "#marketAiRail textarea{min-height:110px;resize:vertical}",
+"#marketAiRail input[type=password]{width:100%;box-sizing:border-box}",
+"#marketAiRail .ai-message small{display:block;opacity:.75;margin-bottom:5px}",
 ".market-ai-row{border:1px solid #c5d3e7;background:#eaf1fc;color:#224d91;border-radius:6px;padding:2px 6px;margin-left:5px;font-size:12px}",
 "body.market-ai-open main{margin-right:min(var(--ai-rail-width,420px),40vw);max-width:none}",
 "@media(max-width:1100px){body.market-ai-open main{margin-right:0}#marketAiRail{width:min(420px,94vw)}}"
 ].join("\n");document.head.append(css);
 const launch=document.createElement("button");launch.type="button";launch.id="marketAiOpen";launch.className="btn secondary";launch.textContent="✨ AI Research";launch.setAttribute("aria-controls","marketAiRail");launch.setAttribute("aria-expanded","false");document.querySelector("header .row")?.append(launch);
 const rail=document.createElement("aside");rail.id="marketAiRail";rail.hidden=true;rail.setAttribute("aria-label","AI research sidebar");
-rail.innerHTML='<div class="ai-head"><strong id="aiTitle">AI Research</strong><div><button class="btn secondary" type="button" id="aiExpand">Expand</button> <button class="btn secondary" type="button" id="aiClose">Collapse</button></div></div><div class="ai-body"><p class="ai-note">Local research workspace · no AI provider connected</p><details id="aiSettings"><summary>AI Settings ⚙</summary><p class="ai-note">Preferences only. No credentials are collected or provider calls made.</p><label>Preferred connection<select id="aiConnection"><option value="local">Local research</option><option value="azure">Azure (not connected)</option><option value="browser">Browser (not connected)</option></select></label><label>Preferred tier<select id="aiTier"><option value="free">Free</option><option value="paid">Paid</option></select></label><label>Primary model preference<input id="aiModel" maxlength="100" placeholder="Not configured"></label><label>Fallback model preference<input id="aiFallback" maxlength="100" placeholder="Optional"></label><label><input id="aiAllowFallback" type="checkbox" style="width:auto"> Prefer same-tier fallback</label><p class="ai-note">Private position context: disabled. Connection status: not connected.</p><button type="button" class="btn secondary" id="aiSaveSettings">Save preferences</button></details><label for="aiScope">Scope</label><select id="aiScope"><option value="security">Security</option><option value="portfolio">Portfolio</option><option value="market">Market</option></select><div id="aiTickerBox"><label for="aiTicker">Ticker</label><input id="aiTicker" maxlength="24" placeholder="NVDA"><button class="btn secondary" type="button" id="aiGoTicker">Open ticker</button></div><div class="ai-actions"><button id="aiNew" type="button">New session</button><button id="aiFork" type="button">Fork</button><button id="aiRename" type="button">Rename</button><button id="aiDelete" type="button">Delete</button></div><strong>Sessions</strong><div id="aiHistory" class="ai-history"></div><button id="aiShowAll" type="button" class="btn secondary">Show all</button><h3 id="aiSessionTitle"></h3><div id="aiMessages" aria-live="polite"></div><div class="ai-actions" id="aiPrompts"></div><label for="aiSavedPrompt">Saved prompt library</label><select id="aiSavedPrompt"><option value="">Choose a saved prompt</option></select><label for="aiQuestion">Editable research question</label><textarea id="aiQuestion" placeholder="Write your research question"></textarea><p class="ai-note">Saving records your question in this browser, without sending it. No AI answer is generated. Portfolio holdings, account identifiers, cost basis and financial values are never attached.</p><button id="aiSave" type="button" class="btn">Save question locally</button><details style="margin-top:12px"><summary>Add a research note or source</summary><label for="aiNote">Research note (manual)</label><textarea id="aiNote" maxlength="20000" placeholder="Record findings or a source-based answer"></textarea><label for="aiSource">Source URL or reference (optional)</label><input id="aiSource" maxlength="500" placeholder="Source reference"><label for="aiSourceDate">Source observation date (optional)</label><input id="aiSourceDate" type="date"><button id="aiSaveNote" class="btn secondary" type="button">Save research note</button></details><p id="aiStatus" role="status" class="ai-note"></p></div>';
+rail.innerHTML='<div class="ai-head"><strong id="aiTitle">AI Research</strong><div><button class="btn secondary" type="button" id="aiExpand">Expand</button> <button class="btn secondary" type="button" id="aiClose">Collapse</button></div></div><div class="ai-body"><p class="ai-note" id="aiProviderNote">Local research workspace · Gemini available by explicit request</p><details id="aiSettings"><summary>AI Settings ⚙</summary><p class="ai-note">Gemini keys stay in this browser only. For private financial data, use the protected Azure gateway instead.</p><label>Preferred connection<select id="aiConnection"><option value="local">Local research</option><option value="azure">Azure (not connected)</option><option value="browser">Browser · Gemini</option></select></label><label>Free Gemini API key<input id="aiFreeKey" type="password" autocomplete="off" spellcheck="false" placeholder="Paste free key"></label><label>Paid Gemini API key<input id="aiPaidKey" type="password" autocomplete="off" spellcheck="false" placeholder="Paste paid key"></label><label><input id="aiRememberKeys" type="checkbox" style="width:auto"> Remember keys on this device (less secure)</label><div class="ai-actions"><button id="aiVerifyFree" type="button">Verify Free key &amp; models</button><button id="aiVerifyPaid" type="button">Verify Paid key &amp; models</button><button id="aiForgetKeys" type="button">Forget keys</button></div><label>Preferred tier<select id="aiTier"><option value="free">Free</option><option value="paid">Paid</option></select></label><label>Primary model<select id="aiModel"><option value="">Verify a key to discover models</option></select></label><label>Fallback model<select id="aiFallback"><option value="">None</option></select></label><label><input id="aiAllowFallback" type="checkbox" style="width:auto"> Prefer same-tier fallback</label><p class="ai-note">Private position context: disabled. Only your typed research question and this thread’s previous user/assistant messages are sent.</p><p class="ai-note" id="aiKeyStatus">Gemini key not verified.</p><button type="button" class="btn secondary" id="aiSaveSettings">Save preferences</button></details><label for="aiScope">Scope</label><select id="aiScope"><option value="security">Security</option><option value="portfolio">Portfolio</option><option value="market">Market</option></select><div id="aiTickerBox"><label for="aiTicker">Ticker</label><input id="aiTicker" maxlength="24" placeholder="NVDA"><button class="btn secondary" type="button" id="aiGoTicker">Open ticker</button></div><div class="ai-actions"><button id="aiNew" type="button">New session</button><button id="aiFork" type="button">Fork</button><button id="aiRename" type="button">Rename</button><button id="aiDelete" type="button">Delete</button></div><strong>Sessions</strong><div id="aiHistory" class="ai-history"></div><button id="aiShowAll" type="button" class="btn secondary">Show all</button><h3 id="aiSessionTitle"></h3><div id="aiMessages" aria-live="polite"></div><div class="ai-actions" id="aiPrompts"></div><label for="aiSavedPrompt">Saved prompt library</label><select id="aiSavedPrompt"><option value="">Choose a saved prompt</option></select><label for="aiQuestion">Editable research question</label><textarea id="aiQuestion" placeholder="Write your research question"></textarea><p class="ai-note">Send requests transmit typed thread messages to Google Gemini. No local portfolio, account, holdings or cost-basis records are attached. Save question locally does not contact Gemini.</p><button id="aiSave" type="button" class="btn secondary">Save question locally</button> <button id="aiSend" type="button" class="btn">Send to Gemini</button><details style="margin-top:12px"><summary>Add a research note or source</summary><label for="aiNote">Research note (manual)</label><textarea id="aiNote" maxlength="20000" placeholder="Record findings or a source-based answer"></textarea><label for="aiSource">Source URL or reference (optional)</label><input id="aiSource" maxlength="500" placeholder="Source reference"><label for="aiSourceDate">Source observation date (optional)</label><input id="aiSourceDate" type="date"><button id="aiSaveNote" class="btn secondary" type="button">Save research note</button></details><p id="aiStatus" role="status" class="ai-note"></p></div>';
 document.body.append(rail);
 let current=null,opened=false,all=false;
 const topics=()=>{if(!Array.isArray(state.aiThreads))state.aiThreads=[];return state.aiThreads};
@@ -48,7 +50,7 @@ function draw(){
  const sorted=topics().slice().sort((a,b)=>String(b.updatedAt).localeCompare(String(a.updatedAt)));
  $("aiHistory").innerHTML=(all?sorted:sorted.slice(0,20)).map(t=>'<div class="ai-thread"><button type="button" data-thread="'+clean(t.threadId)+'" '+(current?.threadId===t.threadId?'aria-current="true"':'')+'>'+clean(t.title)+'</button><small>'+clean(t.topicType)+' · '+clean(t.updatedAt?.slice(0,16)||"")+' · '+(t.messages||[]).length+' entries</small></div>').join("")||'<p class="ai-note">No sessions</p>';
  $("aiShowAll").textContent=all?"Show recent 20":"Show all ("+sorted.length+")";
- $("aiMessages").innerHTML=(current?.messages||[]).map(m=>'<div class="ai-message"><small>'+clean(m.role==="note"?"Manual research note":m.role==="assistant"?"Recorded assistant response":"Saved question, not sent")+' · '+clean(m.createdAt)+'</small><div>'+clean(m.content)+'</div>'+(m.source?'<small>Source: '+clean(m.source)+'</small>':"")+(m.sourceDate?'<small>Source date: '+clean(m.sourceDate)+'</small>':"")+'</div>').join("")||'<p class="ai-note">No entries saved yet.</p>';
+ $("aiMessages").innerHTML=(current?.messages||[]).map(m=>'<div class="ai-message"><small>'+clean(m.role==="note"?"Manual research note":m.role==="assistant"?"Gemini · "+(m.model||"model unknown")+" · "+(m.tier||"free"):m.status==="complete"?"Question sent":m.status==="error"?"Send failed":"Saved question, not sent")+' · '+clean(m.createdAt)+'</small><div>'+clean(m.content)+'</div>'+(m.source?'<small>Source: '+clean(m.source)+'</small>':"")+(m.sourceDate?'<small>Source date: '+clean(m.sourceDate)+'</small>':"")+'</div>').join("")||'<p class="ai-note">No entries saved yet.</p>';
  $("aiPrompts").innerHTML=(scope==="security"?Object.keys(prompts):[]).map(k=>'<button type="button" data-template="'+clean(k)+'">'+clean(k)+'</button>').join("");
  $("aiSavedPrompt").replaceChildren(new Option("Choose a saved prompt",""));for(const p of (state.aiPrompts||[]).filter(p=>p.topicType===scope))$("aiSavedPrompt").add(new Option(p.title,p.promptId));
 }
@@ -59,7 +61,7 @@ function openTopic(scope="portfolio",symbol="",newSession=false){
  const oldCount=topics().length;current=(!newSession&&defaultThread(scope,key))||create(scope,key,newSession?key+" — New session":null);
  opened=true;rail.hidden=false;document.body.classList.add("market-ai-open");launch.setAttribute("aria-expanded","true");
  $("aiQuestion").value=scope==="security"?prompts["Risk & Catalysts"](key):scope==="market"?"What market developments should I research today?":"Which portfolio research topics should I investigate? No holdings data is attached.";
- $("aiStatus").textContent="Not connected to an AI provider.";draw();
+ $("aiStatus").textContent="Research session ready.";draw();
  if(topics().length!==oldCount)persist().catch(e=>$("aiStatus").textContent="Save failed: "+e.message);
 }
 launch.onclick=()=>{if(!db){return}if(current&&topics().includes(current)){opened=true;rail.hidden=false;document.body.classList.add("market-ai-open");launch.setAttribute("aria-expanded","true");draw()}else openTopic("portfolio")};
@@ -79,9 +81,99 @@ $("aiSave").onclick=async()=>{const question=$("aiQuestion").value.trim();if(!cu
 $("aiSaveNote").onclick=async()=>{const t=current,content=$("aiNote").value.trim();if(!t||!topics().includes(t)||!content){$("aiStatus").textContent="Open a session and enter a research note.";return}const message={messageId:uuid(),role:"note",content,createdAt:stamp(),source:$("aiSource").value.trim(),sourceDate:$("aiSourceDate").value||null,contextScope:"local_only",includedPosition:false,status:"manual"};const oldTime=t.updatedAt,oldRevision=t.revision;t.messages.push(message);t.updatedAt=stamp();t.revision++;$("aiSaveNote").disabled=true;try{await persist();if(current===t){$("aiNote").value="";$("aiSource").value="";$("aiSourceDate").value="";$("aiStatus").textContent="Research note saved locally."}}catch(e){t.messages=t.messages.filter(m=>m.messageId!==message.messageId);t.updatedAt=oldTime;t.revision=oldRevision;draw();$("aiStatus").textContent="Save failed: "+e.message}finally{$("aiSaveNote").disabled=false}};
 window.addEventListener("market-portfolio-restored",()=>{current=null;$("aiQuestion").value="";$("aiNote").value="";$("aiSource").value="";$("aiSourceDate").value="";draw()});
 document.addEventListener("click",e=>{const b=e.target.closest("[data-ai-holding]");if(!b)return;e.preventDefault();openTopic("security",b.dataset.aiHolding)});
+
+/* Gemini browser-key profiles are intentionally independent of portfolio state/backup. */
 const prefsKey="market_ai_preferences_v1";
-try{const p=JSON.parse(localStorage.getItem(prefsKey)||"{}");$("aiConnection").value=["local","azure","browser"].includes(p.connection)?p.connection:"local";$("aiTier").value=p.tier==="paid"?"paid":"free";$("aiModel").value=String(p.model||"");$("aiFallback").value=String(p.fallback||"");$("aiAllowFallback").checked=!!p.allowFallback}catch(e){}
-$("aiSaveSettings").onclick=()=>{try{localStorage.setItem(prefsKey,JSON.stringify({connection:$("aiConnection").value,tier:$("aiTier").value,model:$("aiModel").value.trim(),fallback:$("aiFallback").value.trim(),allowFallback:$("aiAllowFallback").checked}));$("aiStatus").textContent="Preferences saved. AI provider not connected."}catch(e){$("aiStatus").textContent="Preferences could not be saved."}};
+const keySession="market_ai_gemini_keys_session_v1",keyRemember="market_ai_gemini_keys_device_v1";
+const modelCatalog={free:[],paid:[]};
+const modelsFallback=["gemini-2.5-flash","gemini-2.5-flash-lite"];
+let sending=false;
+function readKeyStore(storage){try{return JSON.parse(storage.getItem(storage===localStorage?keyRemember:keySession)||"{}")}catch{return {}}}
+function loadKeys(){const k={...readKeyStore(localStorage),...readKeyStore(sessionStorage)};$("aiFreeKey").value=k.free||"";$("aiPaidKey").value=k.paid||"";$("aiRememberKeys").checked=!!localStorage.getItem(keyRemember)}
+function saveKeys(){const values={free:$("aiFreeKey").value.trim(),paid:$("aiPaidKey").value.trim()};if($("aiRememberKeys").checked){localStorage.setItem(keyRemember,JSON.stringify(values));sessionStorage.removeItem(keySession)}else{sessionStorage.setItem(keySession,JSON.stringify(values));localStorage.removeItem(keyRemember)}}
+function forgetKeys(){localStorage.removeItem(keyRemember);sessionStorage.removeItem(keySession);$("aiFreeKey").value="";$("aiPaidKey").value="";modelCatalog.free=[];modelCatalog.paid=[];populateModels();$("aiKeyStatus").textContent="Keys removed from browser storage."}
+function getKey(tier){return (tier==="paid"?$("aiPaidKey"):$("aiFreeKey")).value.trim()}
+const modelName=x=>String(x||"").replace(/^models\//,"");
+function populateModels(){
+ const tier=$("aiTier").value,options=modelCatalog[tier].length?modelCatalog[tier]:modelsFallback;
+ const previousModel=$("aiModel").value||$("aiModel").dataset.preference||modelsFallback[0];
+ const previousFallback=$("aiFallback").value||$("aiFallback").dataset.preference||"";
+ for(const [id,empty] of [["aiModel",false],["aiFallback",true]]){
+  const el=$(id),prior=empty?previousFallback:previousModel;el.replaceChildren();
+  if(empty)el.add(new Option("No fallback",""));
+  for(const model of options)el.add(new Option(model,model));
+  if(prior&&!options.includes(prior))el.add(new Option(prior+" (not verified)",prior));
+  el.value=prior&&(options.includes(prior)||!modelCatalog[tier].length)?prior:empty?"":options[0]||"";
+ }
+}
+function apiError(response,data){const err=new Error(data?.error?.message||"Gemini request failed ("+response.status+")");err.status=response.status;return err}
+async function verifyKey(tier){
+ const key=getKey(tier);if(!key){$("aiKeyStatus").textContent="Enter a "+tier+" API key.";return}
+ const button=$(tier==="paid"?"aiVerifyPaid":"aiVerifyFree");button.disabled=true;$("aiKeyStatus").textContent="Verifying "+tier+" key...";
+ try{
+  const response=await fetch("https://generativelanguage.googleapis.com/v1beta/models?pageSize=200",{headers:{"x-goog-api-key":key}});
+  const data=await response.json();if(!response.ok)throw apiError(response,data);
+  const models=[...new Set((data.models||[]).filter(m=>(m.supportedGenerationMethods||[]).includes("generateContent")&&/^models\/gemini-/.test(m.name)&&!/image|audio|tts|robotics|embedding/i.test(m.name)).map(m=>modelName(m.name)))];
+  if(!models.length)throw Error("No text generation models returned by this key.");
+  modelCatalog[tier]=models;saveKeys();if($("aiTier").value===tier)populateModels();
+  $("aiKeyStatus").textContent=tier+" key verified · "+models.length+" available models. Model availability and billing depend on Google account settings.";
+ }catch(e){$("aiKeyStatus").textContent="Verification failed: "+e.message}finally{button.disabled=false}
+}
+const requestCandidates=()=>{
+ const primary=$("aiModel").value.trim(),fallback=$("aiFallback").value.trim();
+ if(!primary)throw Error("Choose a primary model.");
+ return [primary,...($("aiAllowFallback").checked&&fallback&&fallback!==primary?[fallback]:[])];
+};
+async function generate(model,key,history){
+ const response=await fetch("https://generativelanguage.googleapis.com/v1beta/models/"+encodeURIComponent(model)+":generateContent",{
+  method:"POST",headers:{"Content-Type":"application/json","x-goog-api-key":key},
+  body:JSON.stringify({contents:history,generationConfig:{temperature:0.5}})
+ });
+ const data=await response.json();if(!response.ok)throw apiError(response,data);
+ const parts=data.candidates?.[0]?.content?.parts||[];
+ const answer=parts.filter(p=>typeof p.text==="string").map(p=>p.text).join("\n").trim();
+ if(!answer)throw Error("No text returned by Gemini"+(data.promptFeedback?.blockReason?" ("+data.promptFeedback.blockReason+")":"")+".");
+ return {answer,usage:data.usageMetadata||{}};
+}
+$("aiSend").onclick=async()=>{
+ if(sending)return;
+ const t=current,question=$("aiQuestion").value.trim(),tier=$("aiTier").value,connection=$("aiConnection").value;
+ if(connection!=="browser"){$("aiStatus").textContent="Select Browser · Gemini and save preferences first.";return}
+ if(!t||!topics().includes(t)||!question){$("aiStatus").textContent="Open a session and enter a question.";return}
+ if(question.length>12000){$("aiStatus").textContent="Keep questions under 12,000 characters.";return}
+ const key=getKey(tier);if(!key){$("aiSettings").open=true;$("aiStatus").textContent="Enter a "+tier+" Gemini key in AI Settings.";return}
+ let models;try{models=requestCandidates();saveKeys()}catch(e){$("aiStatus").textContent=e.message;return}
+ const userMessage={messageId:uuid(),role:"user",content:question,createdAt:stamp(),contextScope:"public_market_only",includedPosition:false,status:"saved_not_sent"};
+ const history=(t.messages||[]).filter(m=>(m.role==="user"&&m.status==="complete")||(m.role==="assistant"&&m.status==="complete")).slice(-28).map(m=>({role:m.role==="assistant"?"model":"user",parts:[{text:String(m.content)}]}));
+ history.push({role:"user",parts:[{text:question}]});
+ sending=true;$("aiSend").disabled=true;$("aiStatus").textContent="Sending to Gemini ("+tier+")...";
+ try{
+  let result,usedModel;
+  for(let i=0;i<models.length;i++){
+   try{result=await generate(models[i],key,history);usedModel=models[i];break}
+   catch(e){if(i===models.length-1||![429,500,502,503,504].includes(e.status))throw e;$("aiStatus").textContent="Primary unavailable; trying same-tier fallback..."}
+  }
+  if(!topics().includes(t))throw Error("Original session no longer exists; response was not saved.");
+  userMessage.status="complete";userMessage.tier=tier;userMessage.model=usedModel;
+  t.messages.push(userMessage,{messageId:uuid(),role:"assistant",content:result.answer,createdAt:stamp(),contextScope:"public_market_only",includedPosition:false,status:"complete",model:usedModel,tier,usage:result.usage});
+  t.lastUsedModel=usedModel;t.tierPreference=tier;t.updatedAt=stamp();t.revision++;
+  await persist();if(current===t)$("aiQuestion").value="";
+  $("aiStatus").textContent="Gemini response saved locally · "+usedModel+" · "+tier+" tier.";
+ }catch(e){$("aiStatus").textContent="Gemini error: "+e.message+" — question remains in editor for retry."}
+ finally{sending=false;$("aiSend").disabled=false}
+};
+$("aiVerifyFree").onclick=()=>verifyKey("free");
+$("aiVerifyPaid").onclick=()=>verifyKey("paid");
+$("aiForgetKeys").onclick=forgetKeys;
+$("aiTier").onchange=populateModels;
+$("aiFreeKey").onchange=saveKeys;
+$("aiPaidKey").onchange=saveKeys;
+$("aiRememberKeys").onchange=saveKeys;
+loadKeys();
+
+try{const p=JSON.parse(localStorage.getItem(prefsKey)||"{}");$("aiConnection").value=["local","azure","browser"].includes(p.connection)?p.connection:"local";$("aiTier").value=p.tier==="paid"?"paid":"free";$("aiModel").dataset.preference=String(p.model||"");$("aiFallback").dataset.preference=String(p.fallback||"");$("aiAllowFallback").checked=!!p.allowFallback}catch(e){}
+populateModels();
+$("aiSaveSettings").onclick=()=>{try{localStorage.setItem(prefsKey,JSON.stringify({connection:$("aiConnection").value,tier:$("aiTier").value,model:$("aiModel").value.trim(),fallback:$("aiFallback").value.trim(),allowFallback:$("aiAllowFallback").checked}));saveKeys();$("aiStatus").textContent="AI preferences saved. "+($("aiConnection").value==="browser"?"Browser Gemini ready for a verified key.":"Select Browser · Gemini to send questions.")}catch(e){$("aiStatus").textContent="Preferences could not be saved."}};
 $("aiSavedPrompt").onchange=()=>{const p=(state.aiPrompts||[]).find(p=>p.promptId===$("aiSavedPrompt").value);if(p&&current)$("aiQuestion").value=String(p.text||"").replaceAll("{{TICKER}}",current.topicKey)};
 window.addEventListener("market-portfolio-sync-complete",draw);
 window.addEventListener("market-portfolio-prompts-changed",draw);
