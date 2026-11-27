@@ -6,7 +6,7 @@
   "main": "src/functions.js",
   "scripts": {
     "start": "func start",
-    "check": "node --check src/functions.js && node --check src/brokerage.js"
+    "check": "node --check src/functions.js && node --check src/brokerage.js && node --check src/schwab.js"
   },
   "engines": {
     "node": ">=20"
